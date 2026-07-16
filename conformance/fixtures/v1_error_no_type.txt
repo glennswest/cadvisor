@@ -1,0 +1,3 @@
+Supported request types: "containers,docker,events,machine,subcontainers"
+
+HTTP 400
