@@ -1,0 +1,21 @@
+[package]
+name = "cadvisor"
+description = "cAdvisor-compatible container monitoring daemon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+cadvisor-api.workspace = true
+cadvisor-manager.workspace = true
+cadvisor-metrics.workspace = true
+cadvisor-model.workspace = true
+clap.workspace = true
+humantime.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
