@@ -1,0 +1,18 @@
+[package]
+name = "cadvisor-metrics"
+description = "Prometheus text-format exposition for cadvisor-rs (v0.49.2-compatible metric surface)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+axum.workspace = true
+cadvisor-manager.workspace = true
+cadvisor-model.workspace = true
+ryu.workspace = true
+itoa.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
