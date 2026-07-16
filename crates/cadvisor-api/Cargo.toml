@@ -1,0 +1,17 @@
+[package]
+name = "cadvisor-api"
+description = "REST API routers (v1.0-v1.3, v2.0-v2.1) for cadvisor-rs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+axum.workspace = true
+cadvisor-manager.workspace = true
+cadvisor-model.workspace = true
+futures-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
