@@ -1,0 +1,42 @@
+72 2 0:33 /root / rw,relatime shared:1 - btrfs /dev/sda4 rw,seclabel,compress=zstd:1,ssd,space_cache=v2,subvolid=256,subvol=/root
+37 72 0:6 / /dev rw,nosuid shared:2 - devtmpfs devtmpfs rw,seclabel,size=8143692k,nr_inodes=2035923,mode=755,inode64
+38 37 0:25 / /dev/shm rw,nosuid,nodev shared:3 - tmpfs tmpfs rw,seclabel,inode64,usrquota
+39 37 0:26 / /dev/pts rw,nosuid,noexec,relatime shared:4 - devpts devpts rw,seclabel,gid=5,mode=600,ptmxmode=000
+40 72 0:24 / /sys rw,nosuid,nodev,noexec,relatime shared:5 - sysfs sysfs rw,seclabel
+41 40 0:7 / /sys/kernel/security rw,nosuid,nodev,noexec,relatime shared:6 - securityfs securityfs rw
+42 40 0:28 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime shared:7 - cgroup2 cgroup2 rw,seclabel
+43 40 0:29 / /sys/fs/pstore rw,nosuid,nodev,noexec,relatime shared:8 - pstore none rw,seclabel
+44 40 0:30 / /sys/firmware/efi/efivars rw,nosuid,nodev,noexec,relatime shared:9 - efivarfs efivarfs rw
+45 40 0:31 / /sys/fs/bpf rw,nosuid,nodev,noexec,relatime shared:10 - bpf bpf rw,mode=700
+46 40 0:19 / /sys/kernel/config rw,nosuid,nodev,noexec,relatime shared:11 - configfs configfs rw
+47 72 0:23 / /proc rw,nosuid,nodev,noexec,relatime shared:13 - proc proc rw
+48 72 0:27 / /run rw,nosuid,nodev shared:14 - tmpfs tmpfs rw,seclabel,size=3268552k,nr_inodes=819200,mode=755,inode64
+26 40 0:22 / /sys/fs/selinux rw,nosuid,noexec,relatime shared:12 - selinuxfs selinuxfs rw
+25 47 0:32 / /proc/sys/fs/binfmt_misc rw,relatime shared:15 - autofs systemd-1 rw,fd=41,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=9421
+27 37 0:21 / /dev/mqueue rw,nosuid,nodev,noexec,relatime shared:16 - mqueue mqueue rw,seclabel
+28 40 0:8 / /sys/kernel/debug rw,nosuid,nodev,noexec,relatime shared:18 - debugfs debugfs rw,seclabel
+29 40 0:13 / /sys/kernel/tracing rw,nosuid,nodev,noexec,relatime shared:17 - tracefs tracefs rw,seclabel
+30 37 0:36 / /dev/hugepages rw,nosuid,nodev,relatime shared:19 - hugetlbfs hugetlbfs rw,seclabel,pagesize=2M
+32 40 0:37 / /sys/fs/fuse/connections rw,nosuid,nodev,noexec,relatime shared:20 - fusectl fusectl rw
+67 48 0:38 / /run/credentials/systemd-journald.service ro,nosuid,nodev,noexec,relatime,nosymfollow shared:21 - tmpfs tmpfs rw,seclabel,size=1024k,nr_inodes=1024,mode=700,inode64,noswap
+35 72 0:33 /home /home rw,relatime shared:74 - btrfs /dev/sda4 rw,seclabel,compress=zstd:1,ssd,space_cache=v2,subvolid=257,subvol=/home
+50 72 0:42 / /tmp rw,nosuid,nodev shared:77 - tmpfs tmpfs rw,seclabel,nr_inodes=1048576,inode64,usrquota
+51 72 0:33 /var /var rw,relatime shared:80 - btrfs /dev/sda4 rw,seclabel,compress=zstd:1,ssd,space_cache=v2,subvolid=258,subvol=/var
+56 72 8:3 / /boot rw,relatime shared:83 - ext4 /dev/sda3 rw,seclabel
+59 56 8:2 / /boot/efi rw,relatime shared:86 - vfat /dev/sda2 rw,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=winnt,errors=remount-ro
+146 48 0:44 / /run/credentials/systemd-resolved.service ro,nosuid,nodev,noexec,relatime,nosymfollow shared:89 - tmpfs tmpfs rw,seclabel,size=1024k,nr_inodes=1024,mode=700,inode64,noswap
+152 25 0:48 / /proc/sys/fs/binfmt_misc rw,nosuid,nodev,noexec,relatime shared:92 - binfmt_misc binfmt_misc rw
+415 48 0:55 / /run/credentials/getty@tty1.service ro,nosuid,nodev,noexec,relatime,nosymfollow shared:306 - tmpfs tmpfs rw,seclabel,size=1024k,nr_inodes=1024,mode=700,inode64,noswap
+425 48 0:56 / /run/credentials/serial-getty@ttyS0.service ro,nosuid,nodev,noexec,relatime,nosymfollow shared:353 - tmpfs tmpfs rw,seclabel,size=1024k,nr_inodes=1024,mode=700,inode64,noswap
+66 48 0:53 / /run/user/0 rw,nosuid,nodev,relatime shared:274 - tmpfs tmpfs rw,seclabel,size=1634272k,nr_inodes=408568,mode=700,inode64
+139 48 0:27 /netns /run/netns rw,nosuid,nodev shared:14 - tmpfs tmpfs rw,seclabel,size=3268552k,nr_inodes=819200,mode=755,inode64
+131 28 0:13 / /sys/kernel/debug/tracing rw,nosuid,nodev,noexec,relatime shared:305 - tracefs tracefs rw,seclabel
+201 51 0:33 /var/lib/containers/storage/overlay /var/lib/containers/storage/overlay rw,relatime - btrfs /dev/sda4 rw,seclabel,compress=zstd:1,ssd,space_cache=v2,subvolid=258,subvol=/var
+324 51 0:54 / /var/lib/containers/storage/overlay-containers/2414aad5c9893197d3fe07d9f6405472c2eec7da18075cd47622bc64cd57548c/userdata/shm rw,nosuid,nodev,noexec,relatime shared:328 - tmpfs shm rw,context="system_u:object_r:container_file_t:s0:c647,c978",size=64000k,inode64
+332 139 0:4 net:[4026532450] /run/netns/netns-c3aff51d-d32a-2ee6-f6ff-0eacf0b3cd29 rw shared:336 - nsfs nsfs rw
+333 48 0:4 net:[4026532450] /run/netns/netns-c3aff51d-d32a-2ee6-f6ff-0eacf0b3cd29 rw shared:336 - nsfs nsfs rw
+394 201 0:57 / /var/lib/containers/storage/overlay/3e0acfeff2227a61452116ebcd24ac6e83743cc09482189b5a8ab6307508b853/merged rw,nodev,relatime - overlay overlay rw,context="system_u:object_r:container_file_t:s0:c647,c978",lowerdir=/var/lib/containers/storage/overlay/l/JUVVHANR3L6XAON5WUWE27VIB2,upperdir=/var/lib/containers/storage/overlay/3e0acfeff2227a61452116ebcd24ac6e83743cc09482189b5a8ab6307508b853/diff,workdir=/var/lib/containers/storage/overlay/3e0acfeff2227a61452116ebcd24ac6e83743cc09482189b5a8ab6307508b853/work,redirect_dir=on,uuid=on,metacopy=on
+395 51 0:64 / /var/lib/containers/storage/overlay-containers/eeb39223584480a3303f8a93a9ded742cf63553ccb91b2ea91cc391c678625f3/userdata/shm rw,nosuid,nodev,noexec,relatime shared:366 - tmpfs shm rw,context="system_u:object_r:container_file_t:s0:c1022,c1023",size=64000k,inode64
+404 139 0:4 net:[4026532516] /run/netns/netns-a2ba2539-6817-71f0-9a76-89b05093d885 rw shared:374 - nsfs nsfs rw
+405 48 0:4 net:[4026532516] /run/netns/netns-a2ba2539-6817-71f0-9a76-89b05093d885 rw shared:374 - nsfs nsfs rw
+442 201 0:65 / /var/lib/containers/storage/overlay/98d08973f959ed8862411967fb02cedbce8416f27419cff694ab6715a0c0a6a4/merged rw,relatime - overlay overlay rw,context="system_u:object_r:container_file_t:s0:c1022,c1023",lowerdir=/var/lib/containers/storage/overlay/l/GGHL6RPRYEDKTROMFRM5E5RTQQ:/var/lib/containers/storage/overlay/l/IY744MN5P33AN4VEDYQEDMJDLZ:/var/lib/containers/storage/overlay/l/7FRT67YH3AR2VMMLF7JNAPU3YW:/var/lib/containers/storage/overlay/l/ZUFAMO6CZ6KY7TD6TLDSS7GL2Y:/var/lib/containers/storage/overlay/l/T7P6YKNQ5MOOTJVSQ2RZV4L5P6,upperdir=/var/lib/containers/storage/overlay/98d08973f959ed8862411967fb02cedbce8416f27419cff694ab6715a0c0a6a4/diff,workdir=/var/lib/containers/storage/overlay/98d08973f959ed8862411967fb02cedbce8416f27419cff694ab6715a0c0a6a4/work,redirect_dir=on,uuid=on,metacopy=on

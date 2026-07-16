@@ -1,0 +1,20 @@
+[package]
+name = "cadvisor-host"
+description = "Linux data plane: cgroup-v2, procfs, and sysfs readers for cadvisor-rs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+cadvisor-model.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+inotify.workspace = true
+rustix.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
