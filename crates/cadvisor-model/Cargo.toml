@@ -1,0 +1,16 @@
+[package]
+name = "cadvisor-model"
+description = "cAdvisor wire types (v1, v2, machine, events) with byte-compatible serde"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+chrono.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+# preserve_order makes serde_json::Value keep struct field order, letting the
+# tests assert Go-identical key ordering.
+serde_json = { workspace = true, features = ["preserve_order"] }
