@@ -70,6 +70,20 @@ sockets degrade gracefully to raw-cgroup monitoring. OOM events come from
 `memory.events`; container discovery is inotify-driven with a 1-minute sweep
 as safety net (`--global_housekeeping_interval`).
 
+## Packaging
+
+`make package` builds both `.rpm` and `.deb` via nfpm (same convention as
+rustkube/fastetcd) into `dist/`: `/usr/bin/cadvisor`, a systemd unit, and an
+`EnvironmentFile` at `/etc/cadvisor/cadvisor`. The service is not auto-enabled:
+
+```sh
+dnf install cadvisor-rs-<version>.x86_64.rpm   # or: dpkg -i cadvisor-rs_<version>_amd64.deb
+systemctl enable --now cadvisor
+```
+
+Released artifacts are attached to GitHub releases, so cloud-init/Terragrunt
+units can pin an RPM URL.
+
 ## Developing
 
 Development happens on macOS; everything Linux runs on a dev host over SSH

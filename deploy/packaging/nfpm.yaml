@@ -1,0 +1,35 @@
+# nfpm config — builds BOTH .rpm and .deb for cadvisor-rs.
+#   nfpm package -f deploy/packaging/nfpm.yaml -p rpm -t dist/
+#   nfpm package -f deploy/packaging/nfpm.yaml -p deb -t dist/
+# The binary carries the exact upstream name (/usr/bin/cadvisor) so the
+# package is a drop-in replacement. Point BIN_DIR at the release build dir
+# (default ./target/release). Same convention as rustkube/fastetcd.
+name: "cadvisor-rs"
+arch: "${PKG_ARCH}"        # amd64 / arm64 — set in env at build time
+platform: "linux"
+version: "${PKG_VERSION}"  # e.g. 0.1.0
+section: "admin"
+priority: "optional"
+maintainer: "Glenn West <glennswest@neuralcloudcomputing.com>"
+description: |
+  cAdvisor-compatible container monitoring daemon, reimplemented in Rust.
+  Prometheus /metrics plus REST /api/v1.0-v1.3 and /api/v2.0-v2.1, wire-
+  compatible with google/cadvisor v0.49.2. containerd and CRI-O metadata
+  enrichment; cgroup v2 only.
+vendor: "glennswest"
+homepage: "https://github.com/glennswest/cadvisor"
+license: "Apache-2.0"
+
+contents:
+  - src: "${BIN_DIR}/cadvisor"
+    dst: "/usr/bin/cadvisor"
+
+  - src: "./deploy/systemd/cadvisor.service"
+    dst: "/usr/lib/systemd/system/cadvisor.service"
+
+  - src: "./deploy/systemd/cadvisor.example"
+    dst: "/etc/cadvisor/cadvisor"
+    type: "config|noreplace"
+
+scripts:
+  postinstall: "./deploy/packaging/postinstall.sh"

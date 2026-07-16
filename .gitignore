@@ -4,3 +4,4 @@
 *.tfstate.backup
 .terragrunt-cache/
 .terraform/
+dist/

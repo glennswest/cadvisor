@@ -29,3 +29,13 @@ fixtures:
 
 conformance:
 	@echo "conformance harness lands in M4"
+
+# Build .rpm + .deb on the dev host via nfpm (rustkube/fastetcd convention).
+VERSION := $(shell grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+package: sync
+	ssh $(REMOTE) 'cd $(REMOTE_DIR) && cargo build --release && mkdir -p dist && \
+	  export PKG_ARCH=amd64 PKG_VERSION=$(VERSION) BIN_DIR=./target/release && \
+	  envsubst < deploy/packaging/nfpm.yaml > /tmp/nfpm-resolved.yaml && \
+	  nfpm package -f /tmp/nfpm-resolved.yaml -p rpm -t dist/ && \
+	  nfpm package -f /tmp/nfpm-resolved.yaml -p deb -t dist/ && ls -la dist/'
+	mkdir -p dist && rsync -a $(REMOTE):$(REMOTE_DIR)/dist/ dist/

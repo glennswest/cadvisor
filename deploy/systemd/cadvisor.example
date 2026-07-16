@@ -1,0 +1,8 @@
+# /etc/cadvisor/cadvisor — EnvironmentFile for cadvisor.service.
+#
+# Flags match google/cadvisor v0.49.2 (Go-style single-dash accepted).
+# Defaults: -port 8080, containerd at /run/containerd/containerd.sock
+# (namespace k8s.io), CRI-O at /var/run/crio/crio.sock; missing runtime
+# sockets degrade gracefully to raw-cgroup monitoring.
+
+CADVISOR_ARGS=

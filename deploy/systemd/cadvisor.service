@@ -1,0 +1,24 @@
+[Unit]
+Description=cAdvisor-compatible container monitoring daemon (Rust)
+Documentation=https://github.com/glennswest/cadvisor
+After=network-online.target containerd.service crio.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/cadvisor/cadvisor
+ExecStart=/usr/bin/cadvisor $CADVISOR_ARGS
+Restart=always
+RestartSec=2s
+LimitNOFILE=65536
+
+# Runs as root: needs the full cgroup-v2 tree, every container's /proc/<pid>,
+# and the containerd/CRI-O sockets. No writes outside the runtime dir.
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+RuntimeDirectory=cadvisor
+
+[Install]
+WantedBy=multi-user.target
