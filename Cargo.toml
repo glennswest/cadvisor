@@ -1,0 +1,50 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/cadvisor",
+    "crates/cadvisor-api",
+    "crates/cadvisor-host",
+    "crates/cadvisor-manager",
+    "crates/cadvisor-metrics",
+    "crates/cadvisor-model",
+    "crates/cadvisor-runtime",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+repository = "https://github.com/glennswest/cadvisor"
+
+[workspace.dependencies]
+cadvisor-api = { path = "crates/cadvisor-api" }
+cadvisor-host = { path = "crates/cadvisor-host" }
+cadvisor-manager = { path = "crates/cadvisor-manager" }
+cadvisor-metrics = { path = "crates/cadvisor-metrics" }
+cadvisor-model = { path = "crates/cadvisor-model" }
+cadvisor-runtime = { path = "crates/cadvisor-runtime" }
+
+anyhow = "1"
+axum = "0.8"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+clap = { version = "4", features = ["derive"] }
+containerd-client = "0.9"
+http-body-util = "0.1"
+futures-core = "0.3"
+humantime = "2"
+hyper = "1"
+hyper-util = "0.1"
+inotify = "0.11"
+itoa = "1"
+ryu = "1"
+rustix = { version = "1", features = ["fs"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+lto = "thin"
+strip = true

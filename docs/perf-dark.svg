@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="440" viewBox="0 0 760 440" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" role="img" aria-label="Performance: cadvisor-rs vs cadvisor v0.49.2">
+<rect width="760" height="440" fill="#1a1a19" rx="8"/>
+<text x="12" y="30" font-size="16" font-weight="600" fill="#ffffff">cadvisor-rs vs cadvisor v0.49.2</text>
+<text x="12" y="50" font-size="12" fill="#c3c2b7">Same Fedora 43 host, 60 containers, default flags — lower is better</text>
+<rect x="12" y="68" width="12" height="12" rx="3" fill="#3987e5"/>
+<text x="30" y="78" font-size="12" fill="#c3c2b7">cadvisor v0.49.2</text>
+<rect x="152" y="68" width="12" height="12" rx="3" fill="#008300"/>
+<text x="170" y="78" font-size="12" fill="#c3c2b7">cadvisor-rs</text>
+<text x="12" y="114" font-size="12" fill="#c3c2b7">Resident memory</text>
+<text x="748" y="146" font-size="14" font-weight="600" fill="#ffffff" text-anchor="end">1.7× smaller</text>
+<path d="M12,122 L438,122 Q442,122 442,126 L442,134 Q442,138 438,138 L12,138 Z" fill="#3987e5"/>
+<text x="450" y="134" font-size="12" fill="#ffffff">62.6 MB</text>
+<path d="M12,140 L257.3450479233227,140 Q261.3450479233227,140 261.3450479233227,144 L261.3450479233227,152 Q261.3450479233227,156 257.3450479233227,156 L12,156 Z" fill="#008300"/>
+<text x="269.3450479233227" y="152" font-size="12" fill="#ffffff">36.3 MB</text>
+<text x="12" y="198" font-size="12" fill="#c3c2b7">/metrics scrape time</text>
+<text x="748" y="230" font-size="14" font-weight="600" fill="#ffffff" text-anchor="end">7.0× faster</text>
+<path d="M12,206 L438,206 Q442,206 442,210 L442,218 Q442,222 438,222 L12,222 Z" fill="#3987e5"/>
+<text x="450" y="218" font-size="12" fill="#ffffff">5.9 ms</text>
+<path d="M12,224 L69.22033898305085,224 Q73.22033898305085,224 73.22033898305085,228 L73.22033898305085,236 Q73.22033898305085,240 69.22033898305085,240 L12,240 Z" fill="#008300"/>
+<text x="81.22033898305085" y="236" font-size="12" fill="#ffffff">0.84 ms</text>
+<text x="12" y="282" font-size="12" fill="#c3c2b7">CPU (60 containers)</text>
+<text x="748" y="314" font-size="14" font-weight="600" fill="#ffffff" text-anchor="end">3.9× less</text>
+<path d="M12,290 L438,290 Q442,290 442,294 L442,302 Q442,306 438,306 L12,306 Z" fill="#3987e5"/>
+<text x="450" y="302" font-size="12" fill="#ffffff">5.5 %</text>
+<path d="M12,308 L117.45454545454545,308 Q121.45454545454545,308 121.45454545454545,312 L121.45454545454545,320 Q121.45454545454545,324 117.45454545454545,324 L12,324 Z" fill="#008300"/>
+<text x="129.45454545454544" y="320" font-size="12" fill="#ffffff">1.4 %</text>
+<text x="12" y="366" font-size="12" fill="#c3c2b7">Binary size</text>
+<text x="748" y="398" font-size="14" font-weight="600" fill="#ffffff" text-anchor="end">7.4× smaller</text>
+<path d="M12,374 L438,374 Q442,374 442,378 L442,386 Q442,390 438,390 L12,390 Z" fill="#3987e5"/>
+<text x="450" y="386" font-size="12" fill="#ffffff">46 MB</text>
+<path d="M12,392 L65.95652173913044,392 Q69.95652173913044,392 69.95652173913044,396 L69.95652173913044,404 Q69.95652173913044,408 65.95652173913044,408 L12,408 Z" fill="#008300"/>
+<text x="77.95652173913044" y="404" font-size="12" fill="#ffffff">6.2 MB</text>
+</svg>
