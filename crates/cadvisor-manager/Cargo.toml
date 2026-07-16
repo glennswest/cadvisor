@@ -1,0 +1,19 @@
+[package]
+name = "cadvisor-manager"
+description = "Container registry, stats ring buffer, housekeeping, and discovery for cadvisor-rs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+cadvisor-host.workspace = true
+cadvisor-model.workspace = true
+cadvisor-runtime.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
