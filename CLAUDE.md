@@ -38,6 +38,10 @@ enrichment. Seven crates under `crates/` — see README.md.
   ports, build via sc-build, shipping as a golden), CLAUDE.md created,
   CHANGELOG.md created, stale "deferred (M6/M7/M8)" module comments fixed.
   Also covers #6 (repo ships in a golden and did not say so).
+  Status: docs pushed (3fb2fa9). `sc-build` compiled 3fb2fa9 cleanly (exit
+  code not captured); the re-run to confirm `cargo test` and check `--help`
+  against the README flag table was stopped by the local host (low memory)
+  before output. Next: re-run `sc-build`, then close #7/#6 and request the golden.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - Upstream underscore flag names (`-listen_ip`, `-housekeeping_interval`, …)
