@@ -5,8 +5,10 @@
 //! [`manager`] itself drives the Linux data plane and is
 //! `cfg(target_os = "linux")`.
 //!
-//! Deferred: /summary percentile aggregation (M6), runtime (containerd/CRI-O)
-//! metadata enrichment and per-pod network attribution (M7), OOM events (M8).
+//! The manager also enriches cgroups with containerd/CRI-O metadata, attributes
+//! pod network stats to the sandbox container, and records creation, deletion
+//! and OOM events (from `memory.events`). `/summary` percentiles are computed
+//! in `cadvisor-api` from this crate's stored samples.
 
 pub mod derive;
 pub mod store;
