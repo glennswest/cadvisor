@@ -43,7 +43,10 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- None. Next candidates: #12 (P1 test containers), #8 (P1 presentation).
+- 2026-09-26 — #8 presentation: Marp deck at `docs/presentation.md` (8–15
+  slides: purpose, place in stormcos per stormcentral's relationships graph,
+  architecture diagram, features from the code, planned work, interfaces,
+  shipping/operation, status). Next after: #12 (P1 test containers).
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - Upstream underscore flag names (`-listen_ip`, `-housekeeping_interval`, …)
