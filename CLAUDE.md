@@ -33,15 +33,17 @@ enrichment. Seven crates under `crates/` — see README.md.
 
 ## Work plan
 
+### Done
+- 2026-09-26 — #7 docs rewritten from the code (README, CLAUDE.md,
+  CHANGELOG.md, module comments); also covers #6 (golden shipping documented,
+  linking `stormcos/docs/goldens.md` — the `stormpump/docs/goldens.md` path
+  named in #6 does not exist). Verified with `sc-build 'cargo build && cargo
+  test && cargo run -q -p cadvisor -- --help'` on ccf57ba: exit 0, 64 tests
+  passed, 0 failed; `--help` lists the same 15 flags with the same defaults as
+  the README table. Gaps filed as #9, #10, #11 (and #4 already open).
+
 ### In progress
-- 2026-09-24 — #7 docs rewritten from the code: README (flags, endpoints,
-  ports, build via sc-build, shipping as a golden), CLAUDE.md created,
-  CHANGELOG.md created, stale "deferred (M6/M7/M8)" module comments fixed.
-  Also covers #6 (repo ships in a golden and did not say so).
-  Status: docs pushed (3fb2fa9). `sc-build` compiled 3fb2fa9 cleanly (exit
-  code not captured); the re-run to confirm `cargo test` and check `--help`
-  against the README flag table was stopped by the local host (low memory)
-  before output. Next: re-run `sc-build`, then close #7/#6 and request the golden.
+- None. Next candidates: #12 (P1 test containers), #8 (P1 presentation).
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - Upstream underscore flag names (`-listen_ip`, `-housekeeping_interval`, …)
@@ -53,7 +55,7 @@ enrichment. Seven crates under `crates/` — see README.md.
   sessions.
 - #4 TLS / bearer-token auth — not implemented; the server is plain HTTP.
 
-### Open issues (2026-09-24)
+### Open issues (2026-09-26)
 - #3 container discovery via CRI + cgroups — largely done in-tree (raw cgroup
   discovery + containerd/CRI-O enrichment); pod/namespace labels come from
   runtime labels, not CRI sandbox calls.

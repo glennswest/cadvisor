@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### 2026-09-26
+- **docs:** #7 verified on dev via `sc-build` (64 tests pass; `--help`
+  matches the README flag table); work plan in `CLAUDE.md` updated.
+
 ### 2026-09-24
 - **docs:** README rewritten from the code (#7): what it does today, every
   flag with its real (kebab-case) name and default, endpoints, health paths,
