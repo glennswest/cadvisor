@@ -12,6 +12,9 @@ On stormcos nodes it ships as a **golden** under `stormd` on port **9096** (see
 [How it ships](#how-it-ships)). Elsewhere it is an RPM/DEB with a systemd unit
 on upstream's default port 8080.
 
+A slide deck on its purpose and functionality is in
+[`docs/presentation.md`](docs/presentation.md) (Marp: `npx @marp-team/marp-cli docs/presentation.md`).
+
 ## What it does today
 
 - **Discovery.** It walks `/sys/fs/cgroup` and watches it with inotify, and

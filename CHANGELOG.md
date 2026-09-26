@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### 2026-09-26
+- **docs:** `docs/presentation.md` — 12-slide Marp deck on purpose and
+  functionality (#8): place in stormcos per stormcentral's relationships
+  graph, architecture diagram, features from the code, planned work,
+  interfaces, shipping and status.
 - **docs:** #7 verified on dev via `sc-build` (64 tests pass; `--help`
   matches the README flag table); work plan in `CLAUDE.md` updated.
 
