@@ -34,6 +34,11 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-09-26 — #8 presentation: `docs/presentation.md`, 11-slide Marp deck
+  (linked from README). Rendered with `marp-cli` under `sc-build` (exit 0);
+  64 tests pass. Relationship slide follows `stormcentral/config/stormcentral.toml`
+  (only `stormcos → cadvisor`); runtime neighbours (stormd, stormpump, stormlb,
+  containerd/CRI-O) shown separately with their sources.
 - 2026-09-26 — #7 docs rewritten from the code (README, CLAUDE.md,
   CHANGELOG.md, module comments); also covers #6 (golden shipping documented,
   linking `stormcos/docs/goldens.md` — the `stormpump/docs/goldens.md` path
@@ -43,10 +48,7 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- 2026-09-26 — #8 presentation: Marp deck at `docs/presentation.md` (8–15
-  slides: purpose, place in stormcos per stormcentral's relationships graph,
-  architecture diagram, features from the code, planned work, interfaces,
-  shipping/operation, status). Next after: #12 (P1 test containers).
+- None. Next: #12 (P1 test containers).
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - Upstream underscore flag names (`-listen_ip`, `-housekeeping_interval`, …)
@@ -64,4 +66,3 @@ enrichment. Seven crates under `crates/` — see README.md.
   runtime labels, not CRI sandbox calls.
 - #4 TLS and bearer-token auth — not started.
 - #5 QA tests + must-gather collectors in stormcos_qa — not started.
-- #8 presentation of purpose and functionality — not started.
