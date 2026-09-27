@@ -76,7 +76,8 @@ enrichment. Seven crates under `crates/` — see README.md.
   static-pie; rootless podman build of test/Containerfile OK; image runs
   `workload` (0), no env (2), short vs a real cadvisor (0). The harness found
   #14 (duplicate series in /metrics), fixed in f083ba2 (#14 closed).
-  Strict sc-build on 991ce54: 87 tests pass. Golden requested for the #14 fix.
+  Strict sc-build on 991ce54: 87 tests pass. Golden golden-cadvisor-cc73674e1ff2
+  built with the #14 fix (release request stormcos#110).
   **Blocked (2026-09-27):** the on-node run. `stormcentral test run cadvisor
   short --tag C2NR0Q2` (run 1739abfdc4) built and pushed the image, then
   errored: stormcentral#56 (`@@RESULT` shell quoting), and the node's
