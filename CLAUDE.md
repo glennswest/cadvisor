@@ -48,7 +48,28 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- None. Next: #12 (P1 test containers).
+- 2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
+  Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
+  `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
+  metadata + reference Job in `test/cadvisor-test.yaml`.
+  Facts the design rests on (checked 2026-09-27):
+  - stormcentral's runner (`src/testruns.rs`) builds its own Job: SA
+    `storm-test` with `*` on the run namespace only, no hostNetwork, no
+    cluster-scoped read, image not passed in env → suites read their own pod
+    (`HOSTNAME`) for the image and size waves from cadvisor's
+    `/api/v2.0/machine`, not from `nodes`.
+  - cadvisor on a node: `STORM_NODE:9096` (`--listen-ip 0.0.0.0`).
+  - stormpump names pod cgroups `/stormpump/w<tag>-<n>` (opaque), so a
+    workload pod is found through cadvisor itself: containers created since the
+    pod started (`/api/v2.0/spec?recursive=true`) whose `/api/v2.0/ps` shows
+    `/test workload <run id> …`.
+  - `ps` lists only a cgroup's own `cgroup.procs`, not descendants.
+  Suites: short = health, version, machine, /metrics, housekeeping, a workload
+  pod appears with its CPU/memory and disappears after delete. medium = every
+  endpoint and error contract, events (create/delete, stream), OOM (skip if the
+  runtime applies no limit), accuracy vs a known load, many pods, concurrent
+  scrapes. long = waves of workload pods sized from the machine, measuring
+  discovery latency, scrape time, cadvisor RSS/fds and leftover containers.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - Upstream underscore flag names (`-listen_ip`, `-housekeeping_interval`, …)
