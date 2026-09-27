@@ -100,6 +100,11 @@ impl Output {
             buf.push('\n');
             // client_golang orders series by label values.
             series.sort_by(|a, b| a.0.cmp(&b.0));
+            // …and refuses a series "collected before with the same name and
+            // label values", serving the first (upstream's ContinueOnError).
+            // Two io.stat devices missing from the disk map both get
+            // device="" (#14). The sort is stable, so the first pushed stays.
+            series.dedup_by(|later, first| later.0 == first.0);
             for (labels, value, ts) in series {
                 let label_refs: Vec<(&str, &str)> =
                     labels.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
@@ -518,4 +523,28 @@ pub fn router(manager: Arc<Manager>, opts: MetricsOpts) -> axum::Router {
             ),
         )
         .with_state(state)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_repeated_series_is_served_once_first_wins() {
+        let mut out = Output::default();
+        let l = |d: &str| vec![("device".to_string(), d.to_string()), ("id".to_string(), "/".to_string())];
+        out.push("container_fs_reads_bytes_total", l(""), 1.0, None);
+        out.push("container_fs_reads_bytes_total", l("/dev/sda"), 2.0, None);
+        out.push("container_fs_reads_bytes_total", l(""), 3.0, None);
+        let mut buf = String::new();
+        out.render(&mut buf);
+        let samples: Vec<&str> = buf.lines().filter(|l| !l.starts_with('#')).collect();
+        assert_eq!(
+            samples,
+            [
+                "container_fs_reads_bytes_total{device=\"\",id=\"/\"} 1",
+                "container_fs_reads_bytes_total{device=\"/dev/sda\",id=\"/\"} 2",
+            ]
+        );
+    }
 }

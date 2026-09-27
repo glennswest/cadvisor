@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### 2026-09-27
+- **fix:** `/metrics` no longer repeats a series when two `io.stat` devices
+  missing from the disk map both resolve to `device=""`; the first is served
+  and the rest dropped, as upstream's client_golang does (#14).
+
 ### 2026-09-26
 - **docs:** `docs/presentation.md` — 11-slide Marp deck on purpose and
   functionality (#8): place in stormcos per stormcentral's relationships
