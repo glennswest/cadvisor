@@ -102,8 +102,7 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #4 TLS / bearer-token auth is not implemented; the server is plain HTTP.
 - #3 stormcos pods (stormpump, cgroups `/stormpump/w<tag>-<n>`) get no
   metadata, only `id`. CRI-O's namespace is hardcoded `"crio"`.
-- #12 the test suites have not run on a node yet (stormcentral#56,
-  stormblock-registry#40).
+- #12 the test suites have not run on a node yet (C2NR0Q2 down; see above).
 - The version is still 0.1.0: the #14 fix is in golden cc73674e1ff2 without a
   release tag.
 
@@ -111,6 +110,8 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #12 P1 test container: built and verified on dev; node run blocked.
 - #3 P2 pod metadata (see above). Whether to emit bare `pod`/`namespace`
   labels, which upstream does not, is the owner's call.
+- #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — not started;
+  nothing yet says which cgroup a stormvm hypervisor lands in.
 - #4 P2 TLS and bearer-token auth — not started.
 - #9 P2 upstream flag names.
 - #10 P3 env whitelist. #11 P3 Makefile. #5 P3 must-gather collector only

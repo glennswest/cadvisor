@@ -243,10 +243,11 @@ binary and runs `short` and `medium` against it, with the pod tests skipped.
 tests, the harness, and the image built by `test/build.sh` and podman. They
 have not yet run on a node. The first
 `stormcentral test run cadvisor short --tag C2NR0Q2` built and pushed the
-image, then stopped on two bugs outside this repo: stormcentral#56 (the
-runner's `@@RESULT` line) and stormblock-registry#40 (the node's registry
-cannot seal the pushed image into a golden). #12 stays open until a node run
-passes.
+image, then stopped on stormcentral#56 (the runner's `@@RESULT` line, since
+fixed in stormcentral) and stormblock-registry#40 (the node's registry could
+not seal the pushed image into a golden). The re-run (43e9193e15, 15:08 UTC)
+stopped earlier: C2NR0Q2, the only test machine, did not answer on its
+registry port (:5100). #12 stays open until a node run passes.
 
 ## Crates
 

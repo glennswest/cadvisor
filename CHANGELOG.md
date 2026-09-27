@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### 2026-09-27
+- **docs:** re-checked README, `docs/presentation.md` and `CLAUDE.md` against
+  the code (flags, defaults, ports, routes, shipping). They match. Updated the
+  #12 on-node status (stormcentral#56 fixed; C2NR0Q2's registry is down) and
+  added #15 (per-VM stats) to the open issues.
 - **docs:** refreshed from the code since 2026-09-18. README: the #14 rule
   (a series is served once), stormpump pods have only `id` (#3), how to build
   and test `test/` with `sc-build`, the test suites' on-node status, and the

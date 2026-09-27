@@ -214,8 +214,9 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 
 | Issue | | |
 |---|---|---|
-| #12 | test container on a node | P1; built and verified on dev, the node run is blocked on stormcentral#56 and stormblock-registry#40 |
+| #12 | test container on a node | P1; built and verified on dev; the node run waits for C2NR0Q2 (its registry is down) |
 | #3 | pod metadata | P2; no labels for stormpump pods; CRI-O namespace hardcoded |
+| #15 | per-VM stats keyed to the VMI | P2; not started (asked by stormconsole#14) |
 | #4 | TLS / bearer-token auth | P2; not started |
 | #9 | upstream underscore flag names | P2 |
 | #10 / #11 | env whitelist; Makefile `root@dev` targets | P3 |
