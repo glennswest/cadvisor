@@ -3,6 +3,16 @@
 ## [Unreleased]
 
 ### 2026-09-27
+- **feat:** optional TLS and bearer-token auth on the listener (#4; owner
+  decision #17). New flags: `--tls-cert-file`/`--tls-key-file` (HTTPS only,
+  rustls with ring) and `--bearer-token-file` (one token per line; `401` +
+  `WWW-Authenticate: Bearer` on every path but `/healthz`, `/-/healthy`,
+  `/-/ready`). Certificate, key and tokens are re-read when replaced, and a
+  certificate/key pair that does not match yet is not applied. Off by
+  default, as upstream. End-to-end test `crates/cadvisor/tests/tls_auth.rs`.
+- **docs:** README "TLS and auth", flag table, ports; presentation interfaces
+  and planned slides. Filed stormcos#143 (drop the anonymous cadvisor route;
+  what the golden needs) and stormlb#13 (no TLS to backends).
 - **docs:** re-checked README, `docs/presentation.md` and `CLAUDE.md` against
   the code (flags, defaults, ports, routes, shipping). They match. Updated the
   #12 on-node status (stormcentral#56 fixed; C2NR0Q2's registry is down) and

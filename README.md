@@ -48,15 +48,19 @@ A slide deck on its purpose and functionality is in
 - **Events.** It records container creation and deletion. It also records
   `oom` + `oomKill` events whenever `memory.events` `oom_kill` goes up. Events
   are served on `/api/v1.3/events` and `/api/v2.x/events`.
-- **Not implemented:** TLS and auth (#4; the server is plain HTTP),
-  `--env-metadata-whitelist` (#10), protobuf responses, and upstream's
+- **TLS and bearer tokens (optional, #4).** Off by default, as upstream.
+  See [TLS and auth](#tls-and-auth).
+- **Not implemented:** `--env-metadata-whitelist` (#10), protobuf responses, and upstream's
   default-disabled metric groups (tcp/udp/advtcp, sched, hugetlb, perf,
   resctrl, …). The names of those groups are accepted in the flags and emit
   nothing, which is what a default upstream build does.
 
 ## Endpoints
 
-All of these are served on one HTTP listener (`--listen-ip`:`--port`).
+All of these are served on one listener (`--listen-ip`:`--port`). It is plain
+HTTP, or HTTPS only when `--tls-cert-file` is set. With
+`--bearer-token-file`, every path except the three health paths needs a token
+([TLS and auth](#tls-and-auth)).
 
 | Path | What |
 |---|---|
@@ -106,6 +110,9 @@ use humantime syntax (`1s`, `1m0s`, `2m`). Booleans take a value
 | `--containerd` | `/run/containerd/containerd.sock` | containerd socket |
 | `--containerd-namespace` | `k8s.io` | containerd namespace |
 | `--crio` | `/var/run/crio/crio.sock` | CRI-O socket |
+| `--tls-cert-file` | `""` (plain HTTP) | PEM certificate chain, leaf first. With it the port speaks HTTPS only. Needs `--tls-key-file`. Not in upstream. |
+| `--tls-key-file` | `""` | PEM private key for `--tls-cert-file` |
+| `--bearer-token-file` | `""` (no auth) | Accepted tokens, one per line, `#` comments. Not in upstream. |
 
 These metric group names change the output: `cpu`, `cpuLoad`, `memory`,
 `disk` (fs usage, limits and inodes), `diskIO` (the other `container_fs_*` and
@@ -120,13 +127,51 @@ It needs read access to the whole cgroup v2 tree, to every container's
 `/proc/<pid>`, and to the runtime sockets. In practice that means root, or on
 stormcos, the `host` profile with the pid and uts namespaces shared.
 
+## TLS and auth
+
+Upstream cadvisor has neither. This is an addition for stormcos, where every
+node API is TLS with a stormcert-issued certificate and authenticated
+(stormcos#81; the owner's decision is #17).
+
+- **TLS**: `--tls-cert-file` + `--tls-key-file`, PEM. With them the port
+  serves HTTPS only (rustls, ring; TLS 1.2 and 1.3; ALPN `h2`, `http/1.1`).
+  Setting one without the other is a startup error, and so is a certificate
+  and key that do not match.
+- **Bearer tokens**: `--bearer-token-file`. Any path other than `/healthz`,
+  `/-/healthy` and `/-/ready`, including unknown paths, returns `401` with
+  `WWW-Authenticate: Bearer` unless the request has
+  `Authorization: Bearer <token>` for a token in the file. Tokens are
+  compared in constant time. A file with no tokens is a startup error. A
+  token file without TLS is allowed, with a warning, since the tokens then
+  cross the network in clear.
+- **The health paths stay anonymous**: stormd's liveness probe sends no token.
+  It does speak https, and accepts any certificate.
+- **Rotation without a restart**: the certificate, key and token files are
+  re-read when their mtime, size or inode changes, checked at most every 5 s.
+  A replacement that fails to load is logged, the previous one stays in use,
+  and it is retried. That covers stormcert-agent's renewal, which renames the
+  new key into place before the new certificate, so for a moment the pair does
+  not match.
+- **Shutdown**: on SIGINT the TLS listener stops accepting and in-flight
+  connections are not drained (the plain listener drains them).
+
+Tested end to end by `crates/cadvisor/tests/tls_auth.rs`. It starts the real
+binary with a generated certificate and checks: no plaintext answer, `401`
+without or with a wrong token, `200` with one, health without one, a rotated
+token file, and a key-then-certificate renewal.
+
+On stormcos these are not turned on yet. The golden needs a certificate
+minted for cadvisor, a token file for its scrapers, and an https liveness URL
+(stormcos#143, which also drops the anonymous `cadvisor.storm1.g8.lo` route
+meanwhile).
+
 ## Ports
 
 | Where | Port | Source |
 |---|---|---|
 | Upstream / RPM default | 8080 | `--port` default |
 | stormcos node | 9096 | `argv = ["--port", "9096", "--listen-ip", "0.0.0.0"]` in `stormcentral/components/stormcos.toml` and `stormcos/deploy/build-goldens.sh`. 9095 belongs to stormvm. |
-| stormcos ingress | `cadvisor.storm1.g8.lo` → `127.0.0.1:9096` | HTTPRoute in `stormcos/deploy/manifests/85-routes.yaml`, served by stormlb |
+| stormcos ingress | `cadvisor.storm1.g8.lo` → `127.0.0.1:9096` | HTTPRoute in `stormcos/deploy/manifests/85-routes.yaml`, served by stormlb. It is unauthenticated, and stormcos#143 drops it. stormlb cannot reach a TLS-only backend (stormlb#13). |
 
 ## How it ships
 

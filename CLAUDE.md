@@ -98,6 +98,12 @@ enrichment. Seven crates under `crates/` — see README.md.
   cert and tokens when the files change; without them, plain HTTP as today
   (upstream default). Then file on stormcos: drop the unauthenticated
   cadvisor route until a golden with #4 ships.
+  Done: f3f80e2 (`crates/cadvisor/src/secure.rs`, flags `--tls-cert-file`,
+  `--tls-key-file`, `--bearer-token-file`; health paths exempt because
+  stormd's probe sends no token), e2e test `crates/cadvisor/tests/tls_auth.rs`.
+  sc-build on f3f80e2: 72 tests pass. Filed stormcos#143 (P1) and stormlb#13.
+  Follow-up for #12: the test crate talks plain HTTP without a token; it
+  needs https + a token once stormcos#143 turns them on.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - #9 Upstream underscore flag names (`-listen_ip`, `-housekeeping_interval`, …)
@@ -107,7 +113,9 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #11 Makefile `sync`/`test-linux`/`build-linux`/`package` rsync to
   `root@dev.g8.lo`. They predate sc-build; do not use them from stormcentral
   sessions.
-- #4 TLS / bearer-token auth is not implemented; the server is plain HTTP.
+- #4 TLS / bearer auth is in the code but off unless flags are set; the
+  stormcos golden does not set them yet (stormcos#143: cert, token, https
+  liveness; the anonymous route is dropped meanwhile; stormlb#13).
 - #3 stormcos pods (stormpump, cgroups `/stormpump/w<tag>-<n>`) get no
   metadata, only `id`. CRI-O's namespace is hardcoded `"crio"`.
 - #12 the test suites have not run on a node yet (C2NR0Q2 down; see above).
@@ -120,7 +128,7 @@ enrichment. Seven crates under `crates/` — see README.md.
   labels, which upstream does not, is the owner's call.
 - #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — not started;
   nothing yet says which cgroup a stormvm hypervisor lands in.
-- #4 P2 TLS and bearer-token auth — not started.
+- #4 P2 TLS and bearer-token auth — implemented; closes when verified.
 - #9 P2 upstream flag names.
 - #10 P3 env whitelist. #11 P3 Makefile. #5 P3 must-gather collector only
   (#12 covers the tests).
