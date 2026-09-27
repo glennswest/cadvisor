@@ -84,6 +84,12 @@ enrichment. Seven crates under `crates/` — see README.md.
   sbregistry could not seal the golden (401 from stormblock:
   stormblock-registry#40). Next, once both are fixed: run short, then medium,
   fix what they find, close #12.
+  Re-checked 2026-09-27 15:08 UTC: stormcentral#56 fixed in stormcentral
+  commit 15:07 (issue still open, deploy unconfirmed). Run 43e9193e15 (short,
+  0900b1e) got past power-on and apiserver wait, then C2NR0Q2's sbregistry
+  refused connections on :5100. Other sessions' runs on C2NR0Q2 are failing
+  its /readyz. C2NR0Q2 is the only test machine. Nothing to change in cadvisor;
+  re-run once C2NR0Q2 is healthy.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - #9 Upstream underscore flag names (`-listen_ip`, `-housekeeping_interval`, …)
