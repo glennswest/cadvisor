@@ -8,6 +8,8 @@
   `test/build.sh`, `test/Containerfile`, `test/cadvisor-test.yaml` metadata,
   and a hermetic harness that runs short and medium against the real binary.
 - **docs:** README "Tests on a node".
+- **docs:** `CLAUDE.md` work plan: #12 verified off-node, on-node run blocked
+  (stormcentral#56, stormblock-registry#40).
 - **fix:** `/metrics` no longer repeats a series when two `io.stat` devices
   missing from the disk map both resolve to `device=""`; the first is served
   and the rest dropped, as upstream's client_golang does (#14).

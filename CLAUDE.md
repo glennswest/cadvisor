@@ -75,9 +75,14 @@ enrichment. Seven crates under `crates/` — see README.md.
   binary, pod tests skipped) pass; `test/build.sh --locked` → 3.9 MB
   static-pie; rootless podman build of test/Containerfile OK; image runs
   `workload` (0), no env (2), short vs a real cadvisor (0). The harness found
-  #14 (duplicate series in /metrics), fixed in f083ba2. Next: a real run
-  `stormcentral test run cadvisor short --tag C2NR0Q2` (run 1739abfdc4),
-  then medium; then close #12, #14 and request the golden.
+  #14 (duplicate series in /metrics), fixed in f083ba2 (#14 closed).
+  Strict sc-build on 991ce54: 87 tests pass. Golden requested for the #14 fix.
+  **Blocked (2026-09-27):** the on-node run. `stormcentral test run cadvisor
+  short --tag C2NR0Q2` (run 1739abfdc4) built and pushed the image, then
+  errored: stormcentral#56 (`@@RESULT` shell quoting), and the node's
+  sbregistry could not seal the golden (401 from stormblock:
+  stormblock-registry#40). Next, once both are fixed: run short, then medium,
+  fix what they find, close #12.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - Upstream underscore flag names (`-listen_ip`, `-housekeeping_interval`, …)
