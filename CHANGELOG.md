@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### 2026-09-27
+- **test:** test container per stormcentral's test standard (#12): `test/`
+  (own cargo workspace, static musl `/test short|medium|long`, `FROM scratch`),
+  `test/build.sh`, `test/Containerfile`, `test/cadvisor-test.yaml` metadata,
+  and a hermetic harness that runs short and medium against the real binary.
+- **docs:** README "Tests on a node".
 - **fix:** `/metrics` no longer repeats a series when two `io.stat` devices
   missing from the disk map both resolve to `device=""`; the first is served
   and the rest dropped, as upstream's client_golang does (#14).

@@ -192,6 +192,41 @@ sc-build 'cargo run -p cadvisor-host --example dump machine'
 - The Makefile's `sync`, `test-linux`, `build-linux` and `package` targets
   predate `sc-build`. They rsync to `root@dev.g8.lo`, so do not use them (#11).
 
+## Tests on a node
+
+`test/` holds cadvisor's test container, per stormcentral's
+[`docs/test-standard.md`](https://github.com/glennswest/stormcentral/blob/main/docs/test-standard.md).
+stormcentral builds it (`test/build.sh`, then `podman build -f
+test/Containerfile .`) and runs it as a Job on each test machine:
+`stormcentral test run cadvisor short|medium|long`. It has one image, whose
+program is `/test <suite>`. It writes one JSON line per test and exits 0
+(passed), 1 (a test failed) or 2 (could not run).
+
+| Suite | Budget | What it checks |
+|---|---|---|
+| `short` | < 2 min | `/healthz` and the other health paths; stormd reports cadvisor running (`:9196`); version; machine (API and `/metrics` agree); `/metrics` parses strictly (no duplicate series, a TYPE for every family, timestamps on stats); housekeeping keeps producing samples. Then one workload pod is found, its CPU and memory are reported, and it is gone after the delete. |
+| `medium` | < 30 min | The short checks again. Every v1/v2 endpoint's shape, the `400` listings and the upstream-worded `500` errors. 16 concurrent scrapes. Creation and deletion events, streamed and in the history. OOM kills, as `oom` + `oomKill` events and `container_oom_events_total`. Accuracy against half a core and 128 MiB, with `/metrics` agreeing with the API. One container per core (4–16), all found and all let go. stormd counts no restart. |
+| `long` | the night | Waves of workload containers sized from the machine: two per core, at most a quarter of memory, 4–128. Per wave it records discovery latency, scrape time, drain time, containers left over, and cadvisor's own RSS and fds. The `trend` test fails on a slowdown or on residue that grows. |
+
+How it works on a node:
+
+- **Workloads are this image.** The suites start pods in the run's
+  namespace running `/test workload <marker> cpu=… mem=… secs=…`, pinned to the
+  Job's node. The image name comes from reading the Job's own pod.
+- **A workload is found through cadvisor.** stormpump names pod cgroups
+  opaquely (`/stormpump/w<tag>-<n>`), so the suite looks for the new container
+  whose `/api/v2.0/ps` shows the marker.
+- **Nothing cluster-scoped.** The runner's Role covers only the run's
+  namespace, so waves are sized from cadvisor's `/api/v2.0/machine`, not from
+  `nodes`.
+- **Skips.** `accuracy` needs at least two cores. `oom` is skipped when the
+  runtime applies no pod memory limit. VM waves belong to stormvm's suite.
+  `test/cadvisor-test.yaml` has the full metadata.
+
+On the build box, `cd test && CADVISOR_BIN=<path to cadvisor> cargo test`
+runs the unit tests. It also runs `tests/harness.rs`, which starts the real
+binary and runs `short` and `medium` against it, with the pod tests skipped.
+
 ## Crates
 
 | Crate | Role |
