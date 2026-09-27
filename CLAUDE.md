@@ -91,6 +91,14 @@ enrichment. Seven crates under `crates/` — see README.md.
   its /readyz. C2NR0Q2 is the only test machine. Nothing to change in cadvisor;
   re-run once C2NR0Q2 is healthy.
 
+- 2026-09-27 — #4 TLS + bearer auth (owner decided #17 = A: TLS with a
+  stormcert certificate, bearer tokens checked in cadvisor). Plan: optional
+  flags for cert/key and a token file; with them set, serve HTTPS and require
+  `Authorization: Bearer` on every path except the health paths; reload
+  cert and tokens when the files change; without them, plain HTTP as today
+  (upstream default). Then file on stormcos: drop the unauthenticated
+  cadvisor route until a golden with #4 ships.
+
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - #9 Upstream underscore flag names (`-listen_ip`, `-housekeeping_interval`, …)
   are rejected: clap derives kebab-case (`--listen-ip`).
