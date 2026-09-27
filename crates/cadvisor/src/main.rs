@@ -7,6 +7,9 @@
 
 use clap::Parser;
 
+#[cfg(target_os = "linux")]
+mod secure;
+
 pub const CADVISOR_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Parser, Debug, Clone)]
@@ -72,6 +75,22 @@ pub struct Args {
     /// CRI-O endpoint
     #[arg(long, default_value = "/var/run/crio/crio.sock")]
     pub crio: String,
+
+    /// PEM certificate chain (leaf first) to serve HTTPS with; needs
+    /// --tls-key-file. Re-read when the file is replaced. Empty = plain HTTP
+    #[arg(long, default_value = "")]
+    pub tls_cert_file: String,
+
+    /// PEM private key for --tls-cert-file
+    #[arg(long, default_value = "")]
+    pub tls_key_file: String,
+
+    /// File of accepted bearer tokens, one per line (`#` comments). When set,
+    /// every path except /healthz, /-/healthy and /-/ready needs
+    /// `Authorization: Bearer <token>`. Re-read when the file changes.
+    /// Empty = no auth
+    #[arg(long, default_value = "")]
+    pub bearer_token_file: String,
 }
 
 /// Accepts Go-style single-dash long flags: `-port 8080` -> `--port 8080`.
@@ -131,6 +150,25 @@ fn main() -> anyhow::Result<()> {
         ..Default::default()
     };
 
+    // Checked before anything starts, so a bad certificate or token file is a
+    // startup error rather than a server that refuses everyone.
+    let tls = match (args.tls_cert_file.is_empty(), args.tls_key_file.is_empty()) {
+        (true, true) => None,
+        (false, false) => Some((
+            std::path::PathBuf::from(&args.tls_cert_file),
+            std::path::PathBuf::from(&args.tls_key_file),
+        )),
+        _ => anyhow::bail!("--tls-cert-file and --tls-key-file go together"),
+    };
+    let tokens = if args.bearer_token_file.is_empty() {
+        None
+    } else {
+        Some(secure::tokens(std::path::Path::new(&args.bearer_token_file))?)
+    };
+    if tokens.is_some() && tls.is_none() {
+        tracing::warn!("--bearer-token-file without TLS: tokens cross the network in clear");
+    }
+
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
@@ -169,25 +207,36 @@ fn main() -> anyhow::Result<()> {
                 disabled_groups,
             };
 
-            let app = axum::Router::new()
+            let mut app = axum::Router::new()
                 .route("/healthz", axum::routing::get(|| async { "ok" }))
                 .route("/-/healthy", axum::routing::get(|| async { "ok" }))
                 .route("/-/ready", axum::routing::get(|| async { "ok" }))
                 .merge(cadvisor_metrics::router(manager.clone(), metrics_opts))
                 .merge(cadvisor_api::router(manager.clone()));
+            if let Some(tokens) = tokens {
+                app = app.layer(axum::middleware::from_fn_with_state(tokens, secure::require_bearer));
+            }
 
             let ip = if args.listen_ip.is_empty() { "0.0.0.0" } else { &args.listen_ip };
             let addr = format!("{ip}:{}", args.port);
             let listener = tokio::net::TcpListener::bind(&addr)
                 .await
                 .with_context(|| format!("bind {addr}"))?;
-            tracing::info!(addr, "serving");
-            axum::serve(listener, app)
-                .with_graceful_shutdown(async {
-                    let _ = tokio::signal::ctrl_c().await;
-                    tracing::info!("shutting down");
-                })
-                .await?;
+            let shutdown = async {
+                let _ = tokio::signal::ctrl_c().await;
+                tracing::info!("shutting down");
+            };
+            match tls {
+                Some((cert, key)) => {
+                    let acceptor = secure::acceptor(&cert, &key)?;
+                    tracing::info!(addr, "serving https");
+                    secure::serve_tls(listener, acceptor, app, shutdown).await?;
+                }
+                None => {
+                    tracing::info!(addr, "serving");
+                    axum::serve(listener, app).with_graceful_shutdown(shutdown).await?;
+                }
+            }
             Ok(())
         })
 }

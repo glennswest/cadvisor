@@ -38,10 +38,13 @@ inotify = "0.11"
 itoa = "1"
 ryu = "1"
 rustix = { version = "1", features = ["fs"] }
+# ring backend: static musl, no OpenSSL or cmake (as stormcert, rustkube).
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 tokio = { version = "1", features = ["full"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging", "tls12"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
