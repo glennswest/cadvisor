@@ -40,6 +40,11 @@ A slide deck on its purpose and functionality is in
   missing, those containers are monitored as raw cgroups. Only the pod sandbox
   container reports network stats, which it reads from its init PID's
   `/proc/<pid>/net`.
+- **stormcos pods have no metadata.** On stormcos, pods run under stormpump,
+  not containerd or CRI-O. cadvisor has no client for stormpump, and stormpump
+  names their cgroups opaquely (`/stormpump/w<tag>-<n>`). So those containers
+  are raw cgroups with only the `id` label: no `name`, `image` or
+  `container_label_*` (#3).
 - **Events.** It records container creation and deletion. It also records
   `oom` + `oomKill` events whenever `memory.events` `oom_kill` goes up. Events
   are served on `/api/v1.3/events` and `/api/v2.x/events`.
@@ -56,7 +61,7 @@ All of these are served on one HTTP listener (`--listen-ip`:`--port`).
 | Path | What |
 |---|---|
 | `/healthz`, `/-/healthy`, `/-/ready` | Always `200 ok` once the listener is up. These do not check the collectors. `stormd` probes `/healthz`. |
-| `/metrics` | Prometheus text format 0.0.4, byte-compatible with v0.49.2 at default flags: family names, HELP/TYPE lines, label sets, Go float formatting and per-sample timestamps. |
+| `/metrics` | Prometheus text format 0.0.4, byte-compatible with v0.49.2 at default flags: family names, HELP/TYPE lines, label sets, Go float formatting and per-sample timestamps. A series is never repeated. When two samples would share a name and labels (two `io.stat` devices missing from the disk map both get `device=""`), the first is served, as upstream's client_golang does (#14). |
 | `/api`, `/api/` | `400`, listing the supported API versions (`v1.0,v1.1,v1.2,v1.3,v2.0,v2.1`). |
 | `/api/v1.x/machine`, `/containers/<name>` | v1.0+ |
 | `/api/v1.x/subcontainers/<name>` | v1.1+ |
@@ -172,6 +177,13 @@ sc-build 'cargo test -p cadvisor-metrics'         # any command
 sc-build 'cargo run -p cadvisor-host --example dump machine'
 ```
 
+The test container's crate (`test/`) is its own cargo workspace, so the
+default `sc-build` does not build it. To run its unit tests and harness:
+
+```sh
+sc-build 'T=$(cargo metadata --format-version 1 --no-deps | sed "s/.*\"target_directory\":\"\([^\"]*\)\".*/\1/"); cargo build -p cadvisor && cd test && CADVISOR_BIN=$T/debug/cadvisor cargo test --locked'
+```
+
 - The parsers take `&str`, so `cargo test` covers them on any OS. The data
   plane (`CgroupReader`, `FsService`, `machine_info`, `watch`), the manager,
   the API and the metrics router are `cfg(target_os = "linux")`. A macOS build
@@ -227,6 +239,15 @@ On the build box, `cd test && CADVISOR_BIN=<path to cadvisor> cargo test`
 runs the unit tests. It also runs `tests/harness.rs`, which starts the real
 binary and runs `short` and `medium` against it, with the pod tests skipped.
 
+**Status (2026-09-27):** the suites are verified on the build box: unit
+tests, the harness, and the image built by `test/build.sh` and podman. They
+have not yet run on a node. The first
+`stormcentral test run cadvisor short --tag C2NR0Q2` built and pushed the
+image, then stopped on two bugs outside this repo: stormcentral#56 (the
+runner's `@@RESULT` line) and stormblock-registry#40 (the node's registry
+cannot seal the pushed image into a golden). #12 stays open until a node run
+passes.
+
 ## Crates
 
 | Crate | Role |
@@ -236,8 +257,9 @@ binary and runs `short` and `medium` against it, with the pod tests skipped.
 | `cadvisor-host` | cgroup v2, procfs and sysfs readers, filesystem stats, machine info, inotify watch |
 | `cadvisor-runtime` | containerd (gRPC) and CRI-O (unix-socket HTTP) metadata clients, container-id extraction |
 | `cadvisor-manager` | Container registry, `TimedStore` ring buffer, adaptive housekeeping, discovery, events, runtime enrichment |
-| `cadvisor-metrics` | Hand-written Prometheus exposition. There is no registry, and it renders in one pass into a reused buffer. |
+| `cadvisor-metrics` | Hand-written Prometheus exposition. There is no registry, and it renders in one pass into a reused buffer. A repeated series is dropped, first wins (#14). |
 | `cadvisor-api` | The v1/v2 REST dispatch, with upstream's routing and error contract |
+| `cadvisor-test` (`test/`, own workspace) | The test container: `/test short\|medium\|long` and `/test workload` (see [Tests on a node](#tests-on-a-node)). It is not part of the shipped binary. |
 
 ## Performance
 

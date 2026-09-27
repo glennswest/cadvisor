@@ -8,7 +8,7 @@ description: Purpose and functionality of cadvisor-rs v0.1.0, from the code
 
 <!-- Render: npx @marp-team/marp-cli docs/presentation.md          (HTML)
              npx @marp-team/marp-cli --pdf docs/presentation.md    (PDF)
-     Written 2026-09-26 against cadvisor-rs v0.1.0 (main after #7). Every
+     Written 2026-09-26, refreshed 2026-09-27 against cadvisor-rs v0.1.0 (224fae9). Every
      claim is checkable in the source or in the files named on each slide;
      README.md has the full reference. -->
 
@@ -100,7 +100,8 @@ Seven crates: `cadvisor` (binary), `-model` (wire types), `-host`, `-runtime`,
 - **Runtime metadata**: containerd `containers.v1` / `tasks.v1` in namespace
   `k8s.io`; CRI-O `GET /info`, `GET /containers/<id>`. A missing socket means
   raw cgroups, not an error. Network stats come from the pod sandbox's
-  `/proc/<pid>/net`.
+  `/proc/<pid>/net`. stormcos pods run under stormpump, which has no
+  metadata client: their cgroups (`/stormpump/w<tag>-<n>`) carry only `id` (#3).
 
 ---
 
@@ -109,7 +110,8 @@ Seven crates: `cadvisor` (binary), `-model` (wire types), `-host`, `-runtime`,
 - **`/metrics`**: Prometheus text 0.0.4, byte-compatible with v0.49.2 at default
   flags — family names, HELP/TYPE, label sets, Go float formatting, per-sample
   timestamps. `--disable-metrics` / `--enable-metrics` select groups `cpu`,
-  `cpuLoad`, `memory`, `disk`, `diskIO`, `network`.
+  `cpuLoad`, `memory`, `disk`, `diskIO`, `network`. A repeated series is
+  served once, first wins, as client_golang does (#14).
 - **REST**: `/api/v1.0`–`v1.3` (machine, containers, subcontainers, docker,
   events with the upstream query parameters and `stream=true`) and
   `/api/v2.0`–`v2.1` (version, machine, attributes, stats, spec, summary, ps,
@@ -189,8 +191,8 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 - **Upstream underscore flag names** (`-listen_ip`, `-housekeeping_interval`)
   — rejected today (#9).
 - **`--env-metadata-whitelist`** — parsed, ignored (#10).
-- **Test containers** per the stormcos test standard (#12, P1) and QA +
-  must-gather in stormcos_qa (#5).
+- **Pod metadata on stormcos** — stormpump pods carry only `id` (#3).
+- **A must-gather collector** in stormcos_qa (#5).
 - **Kubelet library seam** — a `cadvisor-kubelet` facade crate and a
   `discovery: bool` manager switch, so rustkube-node can embed node / fs /
   machine stats (plan in `rustkube-node/docs/planning/cadvisor-integration.md`,
@@ -204,15 +206,17 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 
 ## Status and open issues
 
-- **v0.1.0**, 64 tests passing under `sc-build` (2026-09-26). Golden
-  `golden-cadvisor-fff6b7a3761a` built, release request stormcos#110.
-- Docs rewritten from the code (#7); golden shipping documented (#6).
+- **v0.1.0.** Strict `sc-build` on 991ce54: 87 tests (65 workspace, 20 in the
+  test crate, and 2 harness tests that run `short` and `medium` against the real
+  binary). Golden `golden-cadvisor-cc73674e1ff2`, release request stormcos#110.
+- Done since 2026-09-24: docs from the code (#7, #6), this deck (#8), the
+  duplicate-series fix (#14), and the test container in `test/` (#12).
 
 | Issue | | |
 |---|---|---|
-| #12 | test containers (stormcos test standard) | P1, next |
-| #4 | TLS / bearer-token auth | not started |
-| #9 / #10 | flag-name compatibility, env whitelist | open |
-| #11 | Makefile remote targets use `root@dev` | open, do not use them |
-| #3 | CRI discovery | mostly done; pod labels come from runtime labels |
-| #5 | QA + must-gather in stormcos_qa | not started |
+| #12 | test container on a node | P1; built and verified on dev, the node run is blocked on stormcentral#56 and stormblock-registry#40 |
+| #3 | pod metadata | P2; no labels for stormpump pods; CRI-O namespace hardcoded |
+| #4 | TLS / bearer-token auth | P2; not started |
+| #9 | upstream underscore flag names | P2 |
+| #10 / #11 | env whitelist; Makefile `root@dev` targets | P3 |
+| #5 | must-gather collector in stormcos_qa | P3 |

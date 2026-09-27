@@ -86,18 +86,26 @@ enrichment. Seven crates under `crates/` — see README.md.
   fix what they find, close #12.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
-- Upstream underscore flag names (`-listen_ip`, `-housekeeping_interval`, …)
-  are rejected: clap derives kebab-case (`--listen-ip`). See the issue filed
-  from #7.
-- `--env-metadata-whitelist` is parsed and ignored.
-- Makefile `sync`/`test-linux`/`build-linux`/`package` rsync to
-  `root@dev.g8.lo` — predates sc-build; do not use them from stormcentral
+- #9 Upstream underscore flag names (`-listen_ip`, `-housekeeping_interval`, …)
+  are rejected: clap derives kebab-case (`--listen-ip`).
+- #10 `--env-metadata-whitelist` is parsed and ignored. `collect.rs` would
+  render `spec.envs` as `container_env_*`, but nothing fills them.
+- #11 Makefile `sync`/`test-linux`/`build-linux`/`package` rsync to
+  `root@dev.g8.lo`. They predate sc-build; do not use them from stormcentral
   sessions.
-- #4 TLS / bearer-token auth — not implemented; the server is plain HTTP.
+- #4 TLS / bearer-token auth is not implemented; the server is plain HTTP.
+- #3 stormcos pods (stormpump, cgroups `/stormpump/w<tag>-<n>`) get no
+  metadata, only `id`. CRI-O's namespace is hardcoded `"crio"`.
+- #12 the test suites have not run on a node yet (stormcentral#56,
+  stormblock-registry#40).
+- The version is still 0.1.0: the #14 fix is in golden cc73674e1ff2 without a
+  release tag.
 
-### Open issues (2026-09-26)
-- #3 container discovery via CRI + cgroups — largely done in-tree (raw cgroup
-  discovery + containerd/CRI-O enrichment); pod/namespace labels come from
-  runtime labels, not CRI sandbox calls.
-- #4 TLS and bearer-token auth — not started.
-- #5 QA tests + must-gather collectors in stormcos_qa — not started.
+### Open issues (validated 2026-09-27; priorities set in stormcentral)
+- #12 P1 test container: built and verified on dev; node run blocked.
+- #3 P2 pod metadata (see above). Whether to emit bare `pod`/`namespace`
+  labels, which upstream does not, is the owner's call.
+- #4 P2 TLS and bearer-token auth — not started.
+- #9 P2 upstream flag names.
+- #10 P3 env whitelist. #11 P3 Makefile. #5 P3 must-gather collector only
+  (#12 covers the tests).

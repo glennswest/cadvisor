@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### 2026-09-27
+- **docs:** refreshed from the code since 2026-09-18. README: the #14 rule
+  (a series is served once), stormpump pods have only `id` (#3), how to build
+  and test `test/` with `sc-build`, the test suites' on-node status, and the
+  `cadvisor-test` crate. `docs/presentation.md`: status, planned and issue
+  slides. `CLAUDE.md`: known gaps and open issues with priorities.
 - **test:** test container per stormcentral's test standard (#12): `test/`
   (own cargo workspace, static musl `/test short|medium|long`, `FROM scratch`),
   `test/build.sh`, `test/Containerfile`, `test/cadvisor-test.yaml` metadata,
