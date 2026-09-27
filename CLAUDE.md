@@ -104,6 +104,14 @@ enrichment. Seven crates under `crates/` — see README.md.
   sc-build on f3f80e2: 72 tests pass. Filed stormcos#143 (P1) and stormlb#13.
   Follow-up for #12: the test crate talks plain HTTP without a token; it
   needs https + a token once stormcos#143 turns them on.
+  **Where it stopped (2026-09-27, session restart):** code, lock (e432bbc)
+  and docs (f756b89) pushed. Remaining: strict `sc-build` on f756b89
+  (`cargo build --locked && cargo test --locked`, plus a
+  `--release --target x86_64-unknown-linux-musl` build and `--help` showing
+  the three flags). The first attempt timed out in the slot queue, and a
+  re-run was in flight at restart. When it passes: close #4 (evidence:
+  72 tests incl. `tls_auth.rs`; enablement is stormcos#143), then request
+  the golden once (`stormcentral component build cadvisor`).
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - #9 Upstream underscore flag names (`-listen_ip`, `-housekeeping_interval`, …)
