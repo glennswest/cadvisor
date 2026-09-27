@@ -70,6 +70,14 @@ enrichment. Seven crates under `crates/` — see README.md.
   runtime applies no limit), accuracy vs a known load, many pods, concurrent
   scrapes. long = waves of workload pods sized from the machine, measuring
   discovery latency, scrape time, cadvisor RSS/fds and leftover containers.
+  Status (2026-09-27): all of `test/` pushed (55babdc…18234cb). On dev via
+  sc-build: 20 unit tests + harness (short and medium against the real
+  binary, pod tests skipped) pass; `test/build.sh --locked` → 3.9 MB
+  static-pie; rootless podman build of test/Containerfile OK; image runs
+  `workload` (0), no env (2), short vs a real cadvisor (0). The harness found
+  #14 (duplicate series in /metrics), fixed in f083ba2. Next: a real run
+  `stormcentral test run cadvisor short --tag C2NR0Q2` (run 1739abfdc4),
+  then medium; then close #12, #14 and request the golden.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - Upstream underscore flag names (`-listen_ip`, `-housekeeping_interval`, …)
