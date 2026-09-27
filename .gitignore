@@ -5,3 +5,5 @@
 .terragrunt-cache/
 .terraform/
 dist/
+/test/target
+/test/.stage
