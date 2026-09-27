@@ -7,3 +7,4 @@
 dist/
 /test/target
 /test/.stage
+tmp/
