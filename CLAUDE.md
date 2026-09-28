@@ -131,6 +131,10 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #3 stormcos pods (stormpump, cgroups `/stormpump/w<tag>-<n>`) get no
   metadata, only `id`. CRI-O's namespace is hardcoded `"crio"`.
 - #12 the test suites have not run on a node yet (C2NR0Q2 down; see above).
+- #18 `MachineInfo`/`disk_map` is built once at startup and never refreshed
+  (upstream: `-update_machine_info_interval`, 5m). Devices attached later
+  (stormblock ublk/nvme-tcp volumes) render `device=""` and, since #14, all
+  but the first are dropped.
 - The version is still 0.1.0: the #14 fix is in golden cc73674e1ff2 without a
   release tag.
 
@@ -138,6 +142,7 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #12 P1 test container: built and verified on dev; node run blocked.
 - #3 P1 pod metadata (see above); the identity source for stormpump pods is
   rustkube-node#84.
+- #18 P2 machine info never refreshed (hot-attached volumes lose disk IO).
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
 - #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — not started;
   nothing yet says which cgroup a stormvm hypervisor lands in.

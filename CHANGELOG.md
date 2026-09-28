@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### 2026-09-27
+- **docs:** `CLAUDE.md` known gaps and open issues: #18 (machine info never
+  refreshed), found while mining issue comments.
 - **docs:** second refresh from the code since 2026-09-18 (the only code
   change since the first is #4). README: `oom_event` gates
   `container_oom_events_total` and `cpuLoad` includes `container_tasks_state`;
