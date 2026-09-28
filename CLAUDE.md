@@ -111,6 +111,8 @@ enrichment. Seven crates under `crates/` — see README.md.
   metadata, only `id`. (CRI-O's `ContainerReference.namespace = "crio"` is
   upstream's own value, not a gap.)
 - #12 the test suites have not run on a node yet (C2NR0Q2 down; see above).
+  The test crate talks plain HTTP without a token; it needs https + a token
+  once stormcos#143 turns TLS/auth on in the golden.
 - #18 `MachineInfo`/`disk_map` is built once at startup and never refreshed
   (upstream: `-update_machine_info_interval`, 5m). Devices attached later
   (stormblock ublk/nvme-tcp volumes) render `device=""` and, since #14, all
