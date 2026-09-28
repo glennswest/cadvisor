@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### 2026-09-28
+- **docs:** Issue validation pass: #4 closed (72 tests incl. `tls_auth.rs` on d5e94bd); CLAUDE.md work plan updated.
+
 ### 2026-09-27
 - **docs:** `CLAUDE.md` known gaps and open issues: #18 (machine info never
   refreshed), found while mining issue comments.

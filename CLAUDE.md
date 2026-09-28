@@ -34,6 +34,7 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-09-28 — issue validation pass: #4 closed (strict `sc-build` `--locked` on d5e94bd: 72 tests pass incl. `tls_auth.rs`; enabling it in the golden is stormcos#143). #3, #5, #9, #10, #11 re-checked against the code, still real (commented). #6, #7, #8 were already closed. No golden requested yet for the #4 code (still due: `stormcentral component build cadvisor`).
 - 2026-09-27 — docs refresh since 2026-09-18, second pass (after #4):
   README metric groups (`oom_event`), stale comments in `main.rs`,
   `secure.rs`, `cadvisor.example`; presentation/CLAUDE.md issue tables. Every
@@ -95,28 +96,6 @@ enrichment. Seven crates under `crates/` — see README.md.
   its /readyz. C2NR0Q2 is the only test machine. Nothing to change in cadvisor;
   re-run once C2NR0Q2 is healthy.
 
-- 2026-09-27 — #4 TLS + bearer auth (owner decided #17 = A: TLS with a
-  stormcert certificate, bearer tokens checked in cadvisor). Plan: optional
-  flags for cert/key and a token file; with them set, serve HTTPS and require
-  `Authorization: Bearer` on every path except the health paths; reload
-  cert and tokens when the files change; without them, plain HTTP as today
-  (upstream default). Then file on stormcos: drop the unauthenticated
-  cadvisor route until a golden with #4 ships.
-  Done: f3f80e2 (`crates/cadvisor/src/secure.rs`, flags `--tls-cert-file`,
-  `--tls-key-file`, `--bearer-token-file`; health paths exempt because
-  stormd's probe sends no token), e2e test `crates/cadvisor/tests/tls_auth.rs`.
-  sc-build on f3f80e2: 72 tests pass. Filed stormcos#143 (P1) and stormlb#13.
-  Follow-up for #12: the test crate talks plain HTTP without a token; it
-  needs https + a token once stormcos#143 turns them on.
-  **Where it stopped (2026-09-27, session restart):** code, lock (e432bbc)
-  and docs (f756b89) pushed. Remaining: strict `sc-build` on f756b89
-  (`cargo build --locked && cargo test --locked`, plus a
-  `--release --target x86_64-unknown-linux-musl` build and `--help` showing
-  the three flags). The first attempt timed out in the slot queue, and a
-  re-run was in flight at restart. When it passes: close #4 (evidence:
-  72 tests incl. `tls_auth.rs`; enablement is stormcos#143), then request
-  the golden once (`stormcentral component build cadvisor`).
-
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - #9 Upstream underscore flag names (`-listen_ip`, `-housekeeping_interval`, …)
   are rejected: clap derives kebab-case (`--listen-ip`).
@@ -125,11 +104,12 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #11 Makefile `sync`/`test-linux`/`build-linux`/`package` rsync to
   `root@dev.g8.lo`. They predate sc-build; do not use them from stormcentral
   sessions.
-- #4 TLS / bearer auth is in the code but off unless flags are set; the
-  stormcos golden does not set them yet (stormcos#143: cert, token, https
+- TLS / bearer auth (#4, closed) is in the code but off unless flags are set;
+  the stormcos golden does not set them yet (stormcos#143: cert, token, https
   liveness; the anonymous route is dropped meanwhile; stormlb#13).
 - #3 stormcos pods (stormpump, cgroups `/stormpump/w<tag>-<n>`) get no
-  metadata, only `id`. CRI-O's namespace is hardcoded `"crio"`.
+  metadata, only `id`. (CRI-O's `ContainerReference.namespace = "crio"` is
+  upstream's own value, not a gap.)
 - #12 the test suites have not run on a node yet (C2NR0Q2 down; see above).
 - #18 `MachineInfo`/`disk_map` is built once at startup and never refreshed
   (upstream: `-update_machine_info_interval`, 5m). Devices attached later
@@ -138,7 +118,7 @@ enrichment. Seven crates under `crates/` — see README.md.
 - The version is still 0.1.0: the #14 fix is in golden cc73674e1ff2 without a
   release tag.
 
-### Open issues (validated 2026-09-27; priorities set in stormcentral)
+### Open issues (validated 2026-09-28; priorities set in stormcentral)
 - #12 P1 test container: built and verified on dev; node run blocked.
 - #3 P1 pod metadata (see above); the identity source for stormpump pods is
   rustkube-node#84.
@@ -146,7 +126,6 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
 - #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — not started;
   nothing yet says which cgroup a stormvm hypervisor lands in.
-- #4 P2 TLS and bearer-token auth — implemented; closes when verified.
 - #9 P2 upstream flag names.
 - #10 P3 env whitelist. #11 P3 Makefile. #5 P3 must-gather collector only
   (#12 covers the tests).
