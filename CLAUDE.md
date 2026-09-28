@@ -48,6 +48,13 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
+- 2026-09-27 — docs refresh from the code since 2026-09-18 (second pass,
+  after #4). Only code change since 0900b1e is #4 (f3f80e2). Fixing: README
+  metric groups omit `oom_event`; `main.rs` and `cadvisor.example` claim
+  upstream flag names (#9 says not); `secure.rs` says the golden turns TLS on
+  (stormcos#143 not done); presentation/CLAUDE.md issue tables (#3 now P1,
+  #16 missing).
+
 - 2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
   Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
   `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
