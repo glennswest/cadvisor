@@ -1,9 +1,10 @@
 //! cadvisor-rs server binary: wires the subsystems together and owns the
 //! process lifecycle.
 //!
-//! Flag names and defaults mirror google/cadvisor v0.49.2 so it is a drop-in
-//! replacement. Go-style single-dash long flags (`-port 8080`) are accepted
-//! via an argv preprocessor.
+//! Defaults mirror google/cadvisor v0.49.2. Flag names are clap's kebab-case
+//! (`--listen-ip`), not upstream's underscore names (`-listen_ip`), which are
+//! rejected today (#9). Go-style single-dash long flags (`-port 8080`) are
+//! accepted via an argv preprocessor.
 
 use clap::Parser;
 

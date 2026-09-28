@@ -114,12 +114,14 @@ use humantime syntax (`1s`, `1m0s`, `2m`). Booleans take a value
 | `--tls-key-file` | `""` | PEM private key for `--tls-cert-file` |
 | `--bearer-token-file` | `""` (no auth) | Accepted tokens, one per line, `#` comments. Not in upstream. |
 
-These metric group names change the output: `cpu`, `cpuLoad`, `memory`,
+These metric group names change the output: `cpu`, `cpuLoad`
+(`container_cpu_load_*` and `container_tasks_state`), `memory`,
 `disk` (fs usage, limits and inodes), `diskIO` (the other `container_fs_*` and
-`container_blkio_*` families) and `network`. The cpu and memory spec
+`container_blkio_*` families), `network` and `oom_event`
+(`container_oom_events_total`). The cpu and memory spec
 families follow their group. `cadvisor_version_info`, `container_start_time_seconds`,
-`container_last_seen` and the `machine_*` families are always emitted. The groups `percpu`, `app`, `perf_event`, `oom_event` and
-`pressure` are in the `--enable-metrics` universe too. When
+`container_last_seen` and the `machine_*` families are always emitted. The groups `percpu`, `app`, `perf_event` and
+`pressure` are in the `--enable-metrics` universe too and emit nothing. When
 `--enable-metrics` is set, every group in that list that you do not name is
 disabled.
 

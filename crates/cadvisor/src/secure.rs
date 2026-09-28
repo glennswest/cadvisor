@@ -1,8 +1,9 @@
 //! TLS and bearer-token auth for the main listener (#4).
 //!
 //! Both are off by default, as in upstream cadvisor. On stormcos the golden
-//! turns both on: a stormcert-issued certificate (`--tls-cert-file`,
-//! `--tls-key-file`) and a token file (`--bearer-token-file`). With a token
+//! is to turn both on (stormcos#143, not done yet): a stormcert-issued
+//! certificate (`--tls-cert-file`, `--tls-key-file`) and a token file
+//! (`--bearer-token-file`). With a token
 //! file, every path needs `Authorization: Bearer <token>` except the health
 //! paths, which stormd probes without one.
 //!
