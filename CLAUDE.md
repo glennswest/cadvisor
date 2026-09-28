@@ -34,6 +34,9 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-09-28 — docs refresh since 2026-09-18, third pass: README (machine
+  info read once, #18; #12 node-run status; suites plain HTTP), deck issue
+  table (#4 done, #18, #19), this file. New issue: #19.
 - 2026-09-28 — issue validation pass: #4 closed (strict `sc-build` `--locked` on d5e94bd: 72 tests pass incl. `tls_auth.rs`; enabling it in the golden is stormcos#143). #3, #5, #9, #10, #11 re-checked against the code, still real (commented). #6, #7, #8 were already closed. No golden requested yet for the #4 code (still due: `stormcentral component build cadvisor`).
 - 2026-09-27 — docs refresh since 2026-09-18, second pass (after #4):
   README metric groups (`oom_event`), stale comments in `main.rs`,
@@ -111,8 +114,11 @@ enrichment. Seven crates under `crates/` — see README.md.
   metadata, only `id`. (CRI-O's `ContainerReference.namespace = "crio"` is
   upstream's own value, not a gap.)
 - #12 the test suites have not run on a node yet (C2NR0Q2 down; see above).
-  The test crate talks plain HTTP without a token; it needs https + a token
-  once stormcos#143 turns TLS/auth on in the golden.
+  Latest (2026-09-28): C2NR0Q2's :5100 answers again; the furthest run
+  (stormcentral fe3fc66b32) broke at the image push (stormblock-registry#56,
+  fixed in v0.24.1, deploy on C2NR0Q2 unconfirmed).
+- #19 the test crate talks plain HTTP without a token (`test/src/cad.rs`);
+  it needs https + a token once stormcos#143 turns TLS/auth on in the golden.
 - #18 `MachineInfo`/`disk_map` is built once at startup and never refreshed
   (upstream: `-update_machine_info_interval`, 5m). Devices attached later
   (stormblock ublk/nvme-tcp volumes) render `device=""` and, since #14, all
@@ -129,5 +135,6 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — not started;
   nothing yet says which cgroup a stormvm hypervisor lands in.
 - #9 P2 upstream flag names.
+- #19 P2 test suites need https + token (proposed after stormcos#143).
 - #10 P3 env whitelist. #11 P3 Makefile. #5 P3 must-gather collector only
   (#12 covers the tests).

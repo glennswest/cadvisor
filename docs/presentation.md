@@ -8,7 +8,7 @@ description: Purpose and functionality of cadvisor-rs v0.1.0, from the code
 
 <!-- Render: npx @marp-team/marp-cli docs/presentation.md          (HTML)
              npx @marp-team/marp-cli --pdf docs/presentation.md    (PDF)
-     Written 2026-09-26, refreshed 2026-09-27 against cadvisor-rs v0.1.0 (a8b939e). Every
+     Written 2026-09-26, refreshed 2026-09-28 against cadvisor-rs v0.1.0 (12cf251). Every
      claim is checkable in the source or in the files named on each slide;
      README.md has the full reference. -->
 
@@ -200,6 +200,9 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
   identity source is rustkube-node#84. Bare `pod`/`namespace` labels, beyond
   upstream, are an open decision (#16).
 - **A must-gather collector** in stormcos_qa (#5).
+- **Refreshing machine info** (disk map, NICs) on an interval, as upstream
+  does every 5 min, so hot-attached stormblock volumes get a device name (#18).
+- **Test suites over https with a token**, for when stormcos#143 lands (#19).
 - **Kubelet library seam** — a `cadvisor-kubelet` facade crate and a
   `discovery: bool` manager switch, so rustkube-node can embed node / fs /
   machine stats (plan in `rustkube-node/docs/planning/cadvisor-integration.md`,
@@ -217,14 +220,16 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
   test crate, and 2 harness tests that run `short` and `medium` against the real
   binary). Golden `golden-cadvisor-cc73674e1ff2`, release request stormcos#110.
 - Done since 2026-09-24: docs from the code (#7, #6), this deck (#8), the
-  duplicate-series fix (#14), and the test container in `test/` (#12).
+  duplicate-series fix (#14), the test container in `test/` (#12), and
+  TLS/bearer auth (#4; 72 tests on d5e94bd).
 
 | Issue | | |
 |---|---|---|
-| #12 | test container on a node | P1; built and verified on dev; the node run waits for C2NR0Q2 (its registry is down) |
-| #3 | pod metadata | P1; no labels for stormpump pods (waits on rustkube-node#84); CRI-O namespace hardcoded |
+| #12 | test container on a node | P1; built and verified on dev; no node run has passed yet (the last one stopped at the image push) |
+| #3 | pod metadata | P1; no labels for stormpump pods (waits on rustkube-node#84) |
+| #18 | machine info never refreshed | P2; hot-attached volumes get `device=""` |
 | #15 | per-VM stats keyed to the VMI | P2; not started (asked by stormconsole#14) |
-| #4 | TLS / bearer-token auth | in the code (optional flags); on in the golden via stormcos#143 |
+| #19 | test suites need https + a token | P2; after stormcos#143 turns TLS/auth on in the golden (#4, done) |
 | #9 | upstream underscore flag names | P2 |
 | #10 / #11 | env whitelist; Makefile `root@dev` targets | P3 |
 | #5 | must-gather collector in stormcos_qa | P3 |

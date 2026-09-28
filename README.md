@@ -48,6 +48,11 @@ A slide deck on its purpose and functionality is in
 - **Events.** It records container creation and deletion. It also records
   `oom` + `oomKill` events whenever `memory.events` `oom_kill` goes up. Events
   are served on `/api/v1.3/events` and `/api/v2.x/events`.
+- **Machine info is read once, at startup.** CPU topology, memory, NICs and
+  the disk map (`major:minor` → device name) are not refreshed; upstream
+  re-reads them every 5 min (`-update_machine_info_interval`). A block device
+  attached later, such as a stormblock volume, gets `device=""` on its
+  `io.stat` series, and since #14 only the first of those is served (#18).
 - **TLS and bearer tokens (optional, #4).** Off by default, as upstream.
   See [TLS and auth](#tls-and-auth).
 - **Not implemented:** `--env-metadata-whitelist` (#10), protobuf responses, and upstream's
@@ -286,15 +291,15 @@ On the build box, `cd test && CADVISOR_BIN=<path to cadvisor> cargo test`
 runs the unit tests. It also runs `tests/harness.rs`, which starts the real
 binary and runs `short` and `medium` against it, with the pod tests skipped.
 
-**Status (2026-09-27):** the suites are verified on the build box: unit
-tests, the harness, and the image built by `test/build.sh` and podman. They
-have not yet run on a node. The first
-`stormcentral test run cadvisor short --tag C2NR0Q2` built and pushed the
-image, then stopped on stormcentral#56 (the runner's `@@RESULT` line, since
-fixed in stormcentral) and stormblock-registry#40 (the node's registry could
-not seal the pushed image into a golden). The re-run (43e9193e15, 15:08 UTC)
-stopped earlier: C2NR0Q2, the only test machine, did not answer on its
-registry port (:5100). #12 stays open until a node run passes.
+**Status (2026-09-28):** the suites are verified on the build box: unit
+tests, the harness, and the image built by `test/build.sh` and podman. No node
+run has passed yet. C2NR0Q2, the only test machine, answers on its registry
+port (:5100) again. The furthest run (stormcentral `fe3fc66b32`) got as far as
+the image push and hit a broken pipe there (stormblock-registry#56, fixed in
+v0.24.1; not yet confirmed on C2NR0Q2). #12 stays open until a node run passes.
+
+The suites talk plain HTTP and send no token. Once the golden turns on TLS
+and auth (stormcos#143), they have to speak https with a token (#19).
 
 ## Crates
 

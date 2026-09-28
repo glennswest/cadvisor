@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### 2026-09-28
+- **docs:** Refresh from the code since 2026-09-18 (third pass): README says machine info is read once at startup (#18), updates the #12 node-run status and notes the suites speak plain HTTP (#19); presentation issue table and planned slide updated (#4 done, #18, #19); CLAUDE.md work plan.
 - **docs:** Issue validation pass: #4 closed (72 tests incl. `tls_auth.rs` on d5e94bd); CLAUDE.md work plan updated.
 
 ### 2026-09-27
