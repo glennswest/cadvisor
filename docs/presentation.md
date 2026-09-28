@@ -8,7 +8,7 @@ description: Purpose and functionality of cadvisor-rs v0.1.0, from the code
 
 <!-- Render: npx @marp-team/marp-cli docs/presentation.md          (HTML)
              npx @marp-team/marp-cli --pdf docs/presentation.md    (PDF)
-     Written 2026-09-26, refreshed 2026-09-27 against cadvisor-rs v0.1.0 (224fae9). Every
+     Written 2026-09-26, refreshed 2026-09-27 against cadvisor-rs v0.1.0 (a8b939e). Every
      claim is checkable in the source or in the files named on each slide;
      README.md has the full reference. -->
 
@@ -196,7 +196,9 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 - **Upstream underscore flag names** (`-listen_ip`, `-housekeeping_interval`)
   — rejected today (#9).
 - **`--env-metadata-whitelist`** — parsed, ignored (#10).
-- **Pod metadata on stormcos** — stormpump pods carry only `id` (#3).
+- **Pod metadata on stormcos** — stormpump pods carry only `id` (#3); the
+  identity source is rustkube-node#84. Bare `pod`/`namespace` labels, beyond
+  upstream, are an open decision (#16).
 - **A must-gather collector** in stormcos_qa (#5).
 - **Kubelet library seam** — a `cadvisor-kubelet` facade crate and a
   `discovery: bool` manager switch, so rustkube-node can embed node / fs /
@@ -220,9 +222,10 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 | Issue | | |
 |---|---|---|
 | #12 | test container on a node | P1; built and verified on dev; the node run waits for C2NR0Q2 (its registry is down) |
-| #3 | pod metadata | P2; no labels for stormpump pods; CRI-O namespace hardcoded |
+| #3 | pod metadata | P1; no labels for stormpump pods (waits on rustkube-node#84); CRI-O namespace hardcoded |
 | #15 | per-VM stats keyed to the VMI | P2; not started (asked by stormconsole#14) |
 | #4 | TLS / bearer-token auth | in the code (optional flags); on in the golden via stormcos#143 |
 | #9 | upstream underscore flag names | P2 |
 | #10 / #11 | env whitelist; Makefile `root@dev` targets | P3 |
 | #5 | must-gather collector in stormcos_qa | P3 |
+| #16 | decide: bare `pod`/`namespace` labels | P3; owner's call |

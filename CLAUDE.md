@@ -34,6 +34,10 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-09-27 — docs refresh since 2026-09-18, second pass (after #4):
+  README metric groups (`oom_event`), stale comments in `main.rs`,
+  `secure.rs`, `cadvisor.example`; presentation/CLAUDE.md issue tables. Every
+  docs-vs-code gap found is already an issue (#3, #4, #9, #10, #11); none new.
 - 2026-09-26 — #8 presentation: `docs/presentation.md`, 11-slide Marp deck
   (linked from README). Rendered with `marp-cli` under `sc-build` (exit 0);
   64 tests pass. Relationship slide follows `stormcentral/config/stormcentral.toml`
@@ -48,13 +52,6 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- 2026-09-27 — docs refresh from the code since 2026-09-18 (second pass,
-  after #4). Only code change since 0900b1e is #4 (f3f80e2). Fixing: README
-  metric groups omit `oom_event`; `main.rs` and `cadvisor.example` claim
-  upstream flag names (#9 says not); `secure.rs` says the golden turns TLS on
-  (stormcos#143 not done); presentation/CLAUDE.md issue tables (#3 now P1,
-  #16 missing).
-
 - 2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
   Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
   `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
@@ -139,8 +136,9 @@ enrichment. Seven crates under `crates/` — see README.md.
 
 ### Open issues (validated 2026-09-27; priorities set in stormcentral)
 - #12 P1 test container: built and verified on dev; node run blocked.
-- #3 P2 pod metadata (see above). Whether to emit bare `pod`/`namespace`
-  labels, which upstream does not, is the owner's call.
+- #3 P1 pod metadata (see above); the identity source for stormpump pods is
+  rustkube-node#84.
+- #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
 - #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — not started;
   nothing yet says which cgroup a stormvm hypervisor lands in.
 - #4 P2 TLS and bearer-token auth — implemented; closes when verified.

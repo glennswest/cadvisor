@@ -3,6 +3,13 @@
 ## [Unreleased]
 
 ### 2026-09-27
+- **docs:** second refresh from the code since 2026-09-18 (the only code
+  change since the first is #4). README: `oom_event` gates
+  `container_oom_events_total` and `cpuLoad` includes `container_tasks_state`;
+  `percpu`, `app`, `perf_event` and `pressure` emit nothing. `main.rs` and
+  `deploy/systemd/cadvisor.example` no longer claim upstream flag names (#9);
+  `secure.rs` no longer says the golden turns TLS on (stormcos#143 pending).
+  Presentation and `CLAUDE.md`: #3 is P1 (waits on rustkube-node#84), #16 added.
 - **feat:** optional TLS and bearer-token auth on the listener (#4; owner
   decision #17). New flags: `--tls-cert-file`/`--tls-key-file` (HTTPS only,
   rustls with ring) and `--bearer-token-file` (one token per line; `401` +
