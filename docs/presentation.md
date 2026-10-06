@@ -225,6 +225,6 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 | #3 | pod metadata | P1; no labels for stormpump pods (waits on rustkube-node#84) |
 | #15 | per-VM stats keyed to the VMI | P2; blocked on rustkube-node#84 (labels), stormvm#16 (network) |
 | #19 | test suites need https + a token | P2; after stormcos#143 turns TLS/auth on in the golden (#4, done) |
-| #10 / #11 | env whitelist; Makefile `root@dev` targets | P3 |
+| #10 | env whitelist | P3 |
 | #5 | must-gather collector in stormcos_qa | P3 |
 | #16 | decide: bare `pod`/`namespace` labels | P3; owner's call |

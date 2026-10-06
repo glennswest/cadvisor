@@ -131,9 +131,6 @@ enrichment. Seven crates under `crates/` — see README.md.
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - #10 `--env-metadata-whitelist` is parsed and ignored. `collect.rs` would
   render `spec.envs` as `container_env_*`, but nothing fills them.
-- #11 Makefile `sync`/`test-linux`/`build-linux`/`package` rsync to
-  `root@dev.g8.lo`. They predate sc-build; do not use them from stormcentral
-  sessions.
 - TLS / bearer auth (#4, closed) is in the code but off unless flags are set;
   the stormcos golden does not set them yet (stormcos#143: cert, token, https
   liveness; the anonymous route is dropped meanwhile; stormlb#13).
@@ -157,5 +154,5 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — blocked on
   rustkube-node#84 (labels), stormvm#16 (network; SLIRP today).
 - #19 P2 test suites need https + token (proposed after stormcos#143).
-- #10 P3 env whitelist. #11 P3 Makefile. #5 P3 must-gather collector only
+- #10 P3 env whitelist. #5 P3 must-gather collector only
   (#12 covers the tests).

@@ -261,8 +261,11 @@ sc-build 'T=$(cargo metadata --format-version 1 --no-deps | sed "s/.*\"target_di
   with containerd and CRI-O on the g8 Proxmox. Get a vm_id from
   `deploy/terragrunt/free-vmid.sh` first, and run `terragrunt destroy` when
   you are done.
-- The Makefile's `sync`, `test-linux`, `build-linux` and `package` targets
-  predate `sc-build`. They rsync to `root@dev.g8.lo`, so do not use them (#11).
+- Makefile: `make test` (unit tests), `make conformance` (runs both diffs
+  above against already-running REF and OURS), `make package` (release build,
+  then `.rpm` + `.deb` into `dist/` with nfpm). Every target runs where it is
+  invoked. From a stormcentral session, run them through sc-build, e.g.
+  `sc-build 'make package'` (#11).
 
 ## Tests on a node
 
