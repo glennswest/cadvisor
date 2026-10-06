@@ -74,6 +74,11 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
+- 2026-10-06 — #18 machine info refresh: `-update_machine_info_interval`
+  (upstream, default 5m; alias kebab) rebuilds `MachineInfo`; plus a
+  rate-limited `disk_map` re-scan when a sample's `io.stat` major:minor is not
+  in the map (only for keys not already known-missing, so loop devices don't
+  re-scan forever). `disk_map_at(dir)` for a fixture test.
 - 2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
   Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
   `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
