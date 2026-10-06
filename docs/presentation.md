@@ -226,7 +226,7 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 | #12 | test container on a node | P1; built and verified on dev; no node run has passed yet (the last one stopped at the image push) |
 | #3 | pod metadata | P1; no labels for stormpump pods (waits on rustkube-node#84) |
 | #18 | machine info never refreshed | P2; hot-attached volumes get `device=""` |
-| #15 | per-VM stats keyed to the VMI | P2; not started (asked by stormconsole#14) |
+| #15 | per-VM stats keyed to the VMI | P2; blocked on rustkube-node#84 (labels), #18 (disk), stormvm#16 (network) |
 | #19 | test suites need https + a token | P2; after stormcos#143 turns TLS/auth on in the golden (#4, done) |
 | #10 / #11 | env whitelist; Makefile `root@dev` targets | P3 |
 | #5 | must-gather collector in stormcos_qa | P3 |
