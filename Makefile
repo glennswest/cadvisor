@@ -26,8 +26,12 @@ PKG_ARCH ?= amd64
 package:
 	cargo build --release
 	mkdir -p dist tmp
+	# The target dir is wherever cargo puts it (sc-build moves it off ./target).
+	bin_dir=$$(cargo metadata --format-version 1 --no-deps | \
+	    sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')/release && \
 	sed -e 's|$${PKG_ARCH}|$(PKG_ARCH)|g' -e 's|$${PKG_VERSION}|$(VERSION)|g' \
-	    -e 's|$${BIN_DIR}|./target/release|g' deploy/packaging/nfpm.yaml > tmp/nfpm-resolved.yaml
+	    -e "s|\$${BIN_DIR}|$$bin_dir|g" deploy/packaging/nfpm.yaml > tmp/nfpm-resolved.yaml
+	grep -n 'cadvisor"$$' tmp/nfpm-resolved.yaml
 	nfpm package -f tmp/nfpm-resolved.yaml -p rpm -t dist/
 	nfpm package -f tmp/nfpm-resolved.yaml -p deb -t dist/
 	ls -la dist/
