@@ -34,6 +34,14 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-10-06 — #11 Makefile: the remote `root@dev` targets and the `fixtures`
+  stub are gone. `package` builds locally and finds the binary through `cargo
+  metadata` (sc-build's target dir is not ./target; that was #21).
+  `conformance` runs both diff scripts. Verified: `sc-build 'make package'` on
+  4d394f9 → `cadvisor-rs-0.1.0-1.x86_64.rpm` + `cadvisor-rs_0.1.0_amd64.deb`,
+  each with /usr/bin/cadvisor, the unit and /etc/cadvisor/cadvisor. `cargo
+  build --locked && cargo test --locked` passed on 3e64158 (78 tests; the
+  later commit touches only the Makefile). #11 and #21 closed; golden requested.
 - 2026-10-06 — #18 machine info refresh: `-update_machine_info_interval` (5m,
   alias kebab) re-reads `MachineInfo`, and the disk map is re-scanned once per
   new unmapped `io.stat` major:minor (`Manager::note_disks`). Verified with
@@ -82,9 +90,6 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- 2026-10-06 — #11 Makefile: drop `REMOTE`/`sync`/`test-linux`/`build-linux`
-  and the `fixtures` stub; `package` runs locally (`sc-build 'make package'`);
-  `conformance` runs `conformance/diff-metrics.sh` + `diff-api.py`.
 - 2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
   Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
   `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
