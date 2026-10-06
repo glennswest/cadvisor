@@ -82,6 +82,9 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
+- 2026-10-06 — #11 Makefile: drop `REMOTE`/`sync`/`test-linux`/`build-linux`
+  and the `fixtures` stub; `package` runs locally (`sc-build 'make package'`);
+  `conformance` runs `conformance/diff-metrics.sh` + `diff-api.py`.
 - 2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
   Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
   `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
