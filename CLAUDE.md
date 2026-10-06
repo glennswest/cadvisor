@@ -34,6 +34,13 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-10-06 — #18 machine info refresh: `-update_machine_info_interval` (5m,
+  alias kebab) re-reads `MachineInfo`, and the disk map is re-scanned once per
+  new unmapped `io.stat` major:minor (`Manager::note_disks`). Verified with
+  `sc-build 'cargo build --locked && cargo test --locked'` on 500d809: exit 0,
+  78 tests passed. This includes `machine::tests::disk_map_sees_devices_added_later`
+  (fixture /sys/block) and `disk_tests::unknown_disks_lists_only_unmapped`.
+  Not yet seen on a node with a hot-attached volume. #18 closed; golden requested.
 - 2026-10-06 — #15 picked up and checked: VM hypervisor cgroups are
   discovered (raw: CPU, memory, io.stat) but get no labels. The labels are
   blocked on rustkube-node#84 (open, no shape). Disk also needs #18 here.
@@ -74,11 +81,6 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- 2026-10-06 — #18 machine info refresh: `-update_machine_info_interval`
-  (upstream, default 5m; alias kebab) rebuilds `MachineInfo`; plus a
-  rate-limited `disk_map` re-scan when a sample's `io.stat` major:minor is not
-  in the map (only for keys not already known-missing, so loop devices don't
-  re-scan forever). `disk_map_at(dir)` for a fixture test.
 - 2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
   Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
   `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
@@ -140,10 +142,6 @@ enrichment. Seven crates under `crates/` — see README.md.
   fixed in v0.24.1, deploy on C2NR0Q2 unconfirmed).
 - #19 the test crate talks plain HTTP without a token (`test/src/cad.rs`);
   it needs https + a token once stormcos#143 turns TLS/auth on in the golden.
-- #18 `MachineInfo`/`disk_map` is built once at startup and never refreshed
-  (upstream: `-update_machine_info_interval`, 5m). Devices attached later
-  (stormblock ublk/nvme-tcp volumes) render `device=""` and, since #14, all
-  but the first are dropped.
 - The version is still 0.1.0: the #14 fix is in golden cc73674e1ff2 without a
   release tag.
 
@@ -151,10 +149,9 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #12 P1 test container: built and verified on dev; node run blocked.
 - #3 P1 pod metadata (see above); blocked on rustkube-node#84 (the identity
   source for stormpump pods; open, not started as of 2026-10-06).
-- #18 P2 machine info never refreshed (hot-attached volumes lose disk IO).
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
 - #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — blocked on
-  rustkube-node#84 (labels), #18 (disk), stormvm#16 (network; SLIRP today).
+  rustkube-node#84 (labels), stormvm#16 (network; SLIRP today).
 - #19 P2 test suites need https + token (proposed after stormcos#143).
 - #10 P3 env whitelist. #11 P3 Makefile. #5 P3 must-gather collector only
   (#12 covers the tests).
