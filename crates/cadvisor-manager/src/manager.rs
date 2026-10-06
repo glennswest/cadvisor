@@ -38,6 +38,9 @@ pub struct ManagerConfig {
     pub containerd_socket: String,
     pub containerd_namespace: String,
     pub crio_socket: String,
+    /// Env var key prefixes exported as `spec.envs` (upstream
+    /// `-env_metadata_whitelist`); empty = none.
+    pub env_metadata_whitelist: Vec<String>,
 }
 
 impl Default for ManagerConfig {
@@ -54,6 +57,7 @@ impl Default for ManagerConfig {
             containerd_socket: "/run/containerd/containerd.sock".to_string(),
             containerd_namespace: "k8s.io".to_string(),
             crio_socket: "/var/run/crio/crio.sock".to_string(),
+            env_metadata_whitelist: Vec::new(),
         }
     }
 }
@@ -432,6 +436,7 @@ impl Manager {
             reference.namespace = meta.namespace;
             spec.image = meta.image;
             spec.labels = meta.labels;
+            spec.envs = cadvisor_runtime::whitelisted_env(&meta.env, &self.cfg.env_metadata_whitelist);
             spec.has_network = meta.reports_network;
             spec.has_filesystem = meta.rootfs_diff.is_some();
             init_pid = meta.init_pid;

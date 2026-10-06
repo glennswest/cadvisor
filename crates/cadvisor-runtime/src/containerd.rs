@@ -49,6 +49,7 @@ impl ContainerdClient {
             .ok()
             .and_then(|r| r.into_inner().process.map(|p| p.pid));
 
+        let env = container.spec.as_ref().map(|s| crate::oci_spec_env(&s.value)).unwrap_or_default();
         let labels: std::collections::BTreeMap<String, String> =
             container.labels.into_iter().collect();
         // Upstream's containerd handler aliases by bare id only (verified
@@ -66,6 +67,7 @@ impl ContainerdClient {
             reports_network,
             // containerd provides no fs-usage stats (matches upstream).
             rootfs_diff: None,
+            env,
         })
     }
 }

@@ -123,6 +123,9 @@ impl CrioClient {
             init_pid: (info.pid > 0).then_some(info.pid),
             reports_network,
             rootfs_diff,
+            // CRI-O's /containers/<id> has no environment (upstream collects
+            // env metadata for containerd and docker only).
+            env: Vec::new(),
         })
     }
 }

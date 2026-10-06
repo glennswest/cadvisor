@@ -67,7 +67,8 @@ pub struct Args {
     #[arg(long = "whitelisted_container_labels", alias = "whitelisted-container-labels", default_value = "")]
     pub whitelisted_container_labels: String,
 
-    /// Comma-separated environment variable keys to export
+    /// Comma-separated environment variable key prefixes to export as
+    /// container_env_* labels (containerd only, as upstream)
     #[arg(long = "env_metadata_whitelist", alias = "env-metadata-whitelist", default_value = "")]
     pub env_metadata_whitelist: String,
 
@@ -158,6 +159,12 @@ fn main() -> anyhow::Result<()> {
         containerd_socket: args.containerd.clone(),
         containerd_namespace: args.containerd_namespace.clone(),
         crio_socket: args.crio.clone(),
+        env_metadata_whitelist: args
+            .env_metadata_whitelist
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect(),
         ..Default::default()
     };
 

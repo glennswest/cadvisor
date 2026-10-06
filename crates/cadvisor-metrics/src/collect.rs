@@ -126,8 +126,17 @@ impl ContainerLabels {
     ) -> std::collections::BTreeMap<String, String> {
         let spec = handle.spec.read().unwrap();
         let reference = handle.reference.read().unwrap();
+        Self::own_from(handle.name(), &spec, &reference, opts)
+    }
+
+    fn own_from(
+        name: &str,
+        spec: &v1::ContainerSpec,
+        reference: &v1::ContainerReference,
+        opts: &MetricsOpts,
+    ) -> std::collections::BTreeMap<String, String> {
         let mut own = std::collections::BTreeMap::new();
-        own.insert("id".to_string(), handle.name().to_string());
+        own.insert("id".to_string(), name.to_string());
         if let Some(alias) = reference.aliases.first() {
             own.insert("name".to_string(), alias.clone());
         }
@@ -141,8 +150,12 @@ impl ContainerLabels {
                 own.insert(format!("container_label_{}", sanitize_label_name(k)), v.clone());
             }
         }
-        for (k, v) in &spec.envs {
-            own.insert(format!("container_env_{}", sanitize_label_name(k)), v.clone());
+        // Upstream's whitelist-only label set (store_container_labels=false)
+        // carries no env labels.
+        if opts.store_container_labels {
+            for (k, v) in &spec.envs {
+                own.insert(format!("container_env_{}", sanitize_label_name(k)), v.clone());
+            }
         }
         own
     }
@@ -528,6 +541,24 @@ pub fn router(manager: Arc<Manager>, opts: MetricsOpts) -> axum::Router {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn env_labels_follow_store_container_labels() {
+        let mut spec = v1::ContainerSpec::default();
+        spec.labels.insert("app".into(), "web".into());
+        spec.envs.insert("APP_MODE".into(), "prod".into());
+        let reference = v1::ContainerReference::default();
+        let mut opts = MetricsOpts { store_container_labels: true, ..Default::default() };
+        let own = ContainerLabels::own_from("/c", &spec, &reference, &opts);
+        assert_eq!(own.get("container_env_APP_MODE").map(String::as_str), Some("prod"));
+        assert_eq!(own.get("container_label_app").map(String::as_str), Some("web"));
+
+        opts.store_container_labels = false;
+        opts.whitelisted_container_labels = vec!["app".into()];
+        let own = ContainerLabels::own_from("/c", &spec, &reference, &opts);
+        assert!(!own.contains_key("container_env_APP_MODE"));
+        assert_eq!(own.get("container_label_app").map(String::as_str), Some("web"));
+    }
 
     #[test]
     fn a_repeated_series_is_served_once_first_wins() {
