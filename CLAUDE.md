@@ -61,6 +61,11 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
+- 2026-10-06 — #9 upstream flag names: each flag's `long` becomes upstream's
+  spelling (`listen_ip`, …; `containerd-namespace` as upstream), kebab kept as
+  an `alias` (golden runs `--listen-ip`); Go-style bare bools
+  (`-store_container_labels`) accepted; argv rewrite made testable + unit tests
+  for an upstream argv; README flag table.
 - 2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
   Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
   `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
