@@ -48,11 +48,14 @@ A slide deck on its purpose and functionality is in
 - **Events.** It records container creation and deletion. It also records
   `oom` + `oomKill` events whenever `memory.events` `oom_kill` goes up. Events
   are served on `/api/v1.3/events` and `/api/v2.x/events`.
-- **Machine info is read once, at startup.** CPU topology, memory, NICs and
-  the disk map (`major:minor` → device name) are not refreshed; upstream
-  re-reads them every 5 min (`-update_machine_info_interval`). A block device
-  attached later, such as a stormblock volume, gets `device=""` on its
-  `io.stat` series, and since #14 only the first of those is served (#18).
+- **Machine info is re-read every `-update_machine_info_interval`** (5m, as
+  upstream): CPU topology, memory, filesystems, NICs and the disk map
+  (`major:minor` → device name). The disk map is also re-scanned as soon as a
+  container's `io.stat` names a device it lacks, once per new device, so a
+  volume attached after startup (a stormblock ublk / nvme-tcp volume) is named
+  `/dev/<name>` on its next sample rather than `device=""` (#18). Devices
+  `/sys/block` filters out (`loop*`, `ram*`, `sr*`, `fd*`) stay `device=""`,
+  as upstream.
 - **TLS and bearer tokens (optional, #4).** Off by default, as upstream.
   See [TLS and auth](#tls-and-auth).
 - **Not implemented:** `--env-metadata-whitelist` (#10), protobuf responses, and upstream's
@@ -111,6 +114,7 @@ mean `true`, as in Go.
 | `-allow_dynamic_housekeeping` | `true` | Back off idle containers |
 | `-global_housekeeping_interval` | `1m0s` | Full cgroup-tree rediscovery sweep |
 | `-storage_duration` | `2m0s` | How long samples stay in the in-memory ring buffer |
+| `-update_machine_info_interval` | `5m0s` | How often machine info (disk map, filesystems, NICs, memory) is re-read |
 | `-disable_metrics` | `""` | Comma-separated metric groups to leave out of `/metrics` |
 | `-enable_metrics` | `""` | If set, only these groups are emitted. It overrides `-disable_metrics`. |
 | `-store_container_labels` | `true` | Export every runtime label as a `container_label_*` Prometheus label |

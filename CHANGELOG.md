@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### 2026-10-06
+- **fix:** Machine info is refreshed (#18). New flag `-update_machine_info_interval` (alias `--update-machine-info-interval`, default `5m0s`, as upstream) re-reads it, and the disk map is re-scanned as soon as an `io.stat` `major:minor` is missing from it, once per new device. Hot-attached volumes (stormblock ublk / nvme-tcp) now get `device="/dev/<name>"`, so they are no longer collapsed into one `device=""` series and dropped. Tests: fixture `/sys/block` gaining devices, unmapped-key detection, flag parsing.
+- **docs:** README machine-info section and flag table; presentation drops #18 from planned work and the issue table.
 - **docs:** CLAUDE.md work plan: #15 (per-VM stats) checked. It is blocked on rustkube-node#84 (identity), with #18 (disk) and stormvm#16 (network, SLIRP has no interface) as further prerequisites.
 - **fix:** Upstream flag names are accepted (#9): every flag's primary name is now upstream v0.49.2's (`-listen_ip`, `-housekeeping_interval`, `-store_container_labels`, `-containerd-namespace`, …) with the other spelling (`--listen-ip`, `--containerd_namespace`, `--tls_cert_file`) as an alias, so the stormcos golden's `--listen-ip` keeps working. A bare boolean flag (`-store_container_labels`) means `true`, as in Go. Unit tests parse an upstream argv, the golden's argv and the defaults.
 - **docs:** README flag table lists upstream spellings; `main.rs` module comment, `deploy/systemd/cadvisor.example`, presentation and CLAUDE.md no longer say underscore names are rejected.
