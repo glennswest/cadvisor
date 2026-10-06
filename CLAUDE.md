@@ -37,6 +37,12 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-10-06 — #20 docs: argv/port/recipe come from stormcentral's registry
+  database (stormcentral#185), not `components/stormcos.toml`. Service goldens
+  are built by stormcentral, not `build-goldens.sh`. Values checked with
+  `stormcentral component export` (9096, /healthz, `--port 9096 --listen-ip
+  0.0.0.0`, 32M, the three goldens). `sc-build` on 4611a0f: workspace 78 +
+  `test/` 22 tests pass. #20 closed.
 - 2026-10-06 — #11 Makefile: the remote `root@dev` targets and the `fixtures`
   stub are gone. `package` builds locally and finds the binary through `cargo
   metadata` (sc-build's target dir is not ./target; that was #21).
