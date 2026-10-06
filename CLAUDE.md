@@ -40,7 +40,8 @@ enrichment. Seven crates under `crates/` — see README.md.
   `sc-build 'cargo build --locked && cargo test --locked'` on 500d809: exit 0,
   78 tests passed. This includes `machine::tests::disk_map_sees_devices_added_later`
   (fixture /sys/block) and `disk_tests::unknown_disks_lists_only_unmapped`.
-  Not yet seen on a node with a hot-attached volume. #18 closed; golden requested.
+  Not yet seen on a node with a hot-attached volume. #18 closed; golden
+  golden-cadvisor-5d0f953b1af8 (stormcos#331; #9 was golden-cadvisor-fd886e5a8788).
 - 2026-10-06 — #15 picked up and checked: VM hypervisor cgroups are
   discovered (raw: CPU, memory, io.stat) but get no labels. The labels are
   blocked on rustkube-node#84 (open, no shape). Disk also needs #18 here.
