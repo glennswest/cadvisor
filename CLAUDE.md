@@ -99,6 +99,11 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
+- 2026-10-06 — #10 env whitelist: containerd's OCI spec `process.env` →
+  `ContainerMeta.env`; manager keeps vars whose key starts with a whitelist
+  entry (upstream prefix match) into `spec.envs`; `container_env_*` only when
+  `store_container_labels` (upstream `BaseContainerLabels` has no envs).
+  CRI-O: none, as upstream (its inspect has no env).
 - 2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
   Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
   `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
