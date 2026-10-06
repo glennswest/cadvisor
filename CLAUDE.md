@@ -34,6 +34,14 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-10-06 — #9 upstream flag names: every flag's `long` is upstream's
+  (`listen_ip`, …; `containerd-namespace` as upstream), the other spelling an
+  `alias` (golden's `--listen-ip` keeps working); bare Go bools mean true.
+  Verified with `sc-build 'cargo build --locked && cargo test --locked && cargo
+  run -q -p cadvisor -- --help && cargo run -q -p cadvisor -- -listen_ip
+  127.0.0.1 -port 0 -housekeeping_interval 10s -store_container_labels
+  --version'` on e63f9cd: exit 0 (`--help` lists underscore names; the
+  upstream argv parses). #9 closed; golden requested.
 - 2026-10-06 — #3 picked up and re-checked: discovery, cgroup v2 stats and
   the containerd/CRI-O labels are done; the only remaining work (identity for
   stormpump pods) is blocked on rustkube-node#84, still open with no shape
@@ -61,11 +69,6 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- 2026-10-06 — #9 upstream flag names: each flag's `long` becomes upstream's
-  spelling (`listen_ip`, …; `containerd-namespace` as upstream), kebab kept as
-  an `alias` (golden runs `--listen-ip`); Go-style bare bools
-  (`-store_container_labels`) accepted; argv rewrite made testable + unit tests
-  for an upstream argv; README flag table.
 - 2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
   Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
   `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
@@ -110,8 +113,6 @@ enrichment. Seven crates under `crates/` — see README.md.
   re-run once C2NR0Q2 is healthy.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
-- #9 Upstream underscore flag names (`-listen_ip`, `-housekeeping_interval`, …)
-  are rejected: clap derives kebab-case (`--listen-ip`).
 - #10 `--env-metadata-whitelist` is parsed and ignored. `collect.rs` would
   render `spec.envs` as `container_env_*`, but nothing fills them.
 - #11 Makefile `sync`/`test-linux`/`build-linux`/`package` rsync to
@@ -144,7 +145,6 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
 - #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — not started;
   nothing yet says which cgroup a stormvm hypervisor lands in.
-- #9 P2 upstream flag names.
 - #19 P2 test suites need https + token (proposed after stormcos#143).
 - #10 P3 env whitelist. #11 P3 Makefile. #5 P3 must-gather collector only
   (#12 covers the tests).
