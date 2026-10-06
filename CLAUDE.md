@@ -34,6 +34,11 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-10-06 — #15 picked up and checked: VM hypervisor cgroups are
+  discovered (raw: CPU, memory, io.stat) but get no labels. The labels are
+  blocked on rustkube-node#84 (open, no shape). Disk also needs #18 here.
+  Network needs stormvm#16 (SLIRP today: no tap, no netns, nothing to measure).
+  Commented; item proposed `--after rustkube-node#84`. No code change.
 - 2026-10-06 — #9 upstream flag names: every flag's `long` is upstream's
   (`listen_ip`, …; `containerd-namespace` as upstream), the other spelling an
   `alias` (golden's `--listen-ip` keeps working); bare Go bools mean true.
@@ -143,8 +148,8 @@ enrichment. Seven crates under `crates/` — see README.md.
   source for stormpump pods; open, not started as of 2026-10-06).
 - #18 P2 machine info never refreshed (hot-attached volumes lose disk IO).
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
-- #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — not started;
-  nothing yet says which cgroup a stormvm hypervisor lands in.
+- #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — blocked on
+  rustkube-node#84 (labels), #18 (disk), stormvm#16 (network; SLIRP today).
 - #19 P2 test suites need https + token (proposed after stormcos#143).
 - #10 P3 env whitelist. #11 P3 Makefile. #5 P3 must-gather collector only
   (#12 covers the tests).

@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### 2026-10-06
+- **docs:** CLAUDE.md work plan: #15 (per-VM stats) checked. It is blocked on rustkube-node#84 (identity), with #18 (disk) and stormvm#16 (network, SLIRP has no interface) as further prerequisites.
 - **fix:** Upstream flag names are accepted (#9): every flag's primary name is now upstream v0.49.2's (`-listen_ip`, `-housekeeping_interval`, `-store_container_labels`, `-containerd-namespace`, …) with the other spelling (`--listen-ip`, `--containerd_namespace`, `--tls_cert_file`) as an alias, so the stormcos golden's `--listen-ip` keeps working. A bare boolean flag (`-store_container_labels`) means `true`, as in Go. Unit tests parse an upstream argv, the golden's argv and the defaults.
 - **docs:** README flag table lists upstream spellings; `main.rs` module comment, `deploy/systemd/cadvisor.example`, presentation and CLAUDE.md no longer say underscore names are rejected.
 - **docs:** CLAUDE.md work plan: #3 re-checked; its remaining work (stormpump pod identity) is blocked on rustkube-node#84.
