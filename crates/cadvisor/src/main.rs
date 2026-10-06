@@ -1,10 +1,12 @@
 //! cadvisor-rs server binary: wires the subsystems together and owns the
 //! process lifecycle.
 //!
-//! Defaults mirror google/cadvisor v0.49.2. Flag names are clap's kebab-case
-//! (`--listen-ip`), not upstream's underscore names (`-listen_ip`), which are
-//! rejected today (#9). Go-style single-dash long flags (`-port 8080`) are
-//! accepted via an argv preprocessor.
+//! Defaults and flag names mirror google/cadvisor v0.49.2 (`-listen_ip`,
+//! `-housekeeping_interval`, `-containerd-namespace`, …). Each flag also
+//! answers to the other spelling (`--listen-ip`, `--containerd_namespace`),
+//! which stormcos's golden uses (#9). Go-style single-dash long flags
+//! (`-port 8080`) are accepted via an argv preprocessor, and a boolean flag
+//! given bare (`-store_container_labels`) means `true`, as in Go.
 
 use clap::Parser;
 
@@ -17,7 +19,7 @@ pub const CADVISOR_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[command(name = "cadvisor", version, about = "cAdvisor-compatible container monitoring daemon")]
 pub struct Args {
     /// IP to listen on (empty = all interfaces)
-    #[arg(long, default_value = "")]
+    #[arg(long = "listen_ip", alias = "listen-ip", default_value = "")]
     pub listen_ip: String,
 
     /// Port to listen on
@@ -25,44 +27,44 @@ pub struct Args {
     pub port: u16,
 
     /// Interval between container housekeepings
-    #[arg(long, default_value = "1s")]
+    #[arg(long = "housekeeping_interval", alias = "housekeeping-interval", default_value = "1s")]
     pub housekeeping_interval: String,
 
     /// Largest interval to allow between container housekeepings
-    #[arg(long, default_value = "60s")]
+    #[arg(long = "max_housekeeping_interval", alias = "max-housekeeping-interval", default_value = "60s")]
     pub max_housekeeping_interval: String,
 
     /// Whether to allow the housekeeping interval to be dynamic
-    #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
+    #[arg(long = "allow_dynamic_housekeeping", alias = "allow-dynamic-housekeeping", default_value_t = true, action = clap::ArgAction::Set, num_args = 0..=1, default_missing_value = "true")]
     pub allow_dynamic_housekeeping: bool,
 
     /// Interval between global housekeepings (container discovery sweep)
-    #[arg(long, default_value = "1m0s")]
+    #[arg(long = "global_housekeeping_interval", alias = "global-housekeeping-interval", default_value = "1m0s")]
     pub global_housekeeping_interval: String,
 
     /// How long to keep data stored
-    #[arg(long, default_value = "2m0s")]
+    #[arg(long = "storage_duration", alias = "storage-duration", default_value = "2m0s")]
     pub storage_duration: String,
 
     /// Comma-separated list of metric groups to disable
-    #[arg(long, default_value = "")]
+    #[arg(long = "disable_metrics", alias = "disable-metrics", default_value = "")]
     pub disable_metrics: String,
 
     /// Comma-separated list of metric groups to enable (overrides disable)
-    #[arg(long, default_value = "")]
+    #[arg(long = "enable_metrics", alias = "enable-metrics", default_value = "")]
     pub enable_metrics: String,
 
     /// Whether to convert container labels and env vars to prometheus labels
-    #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
+    #[arg(long = "store_container_labels", alias = "store-container-labels", default_value_t = true, action = clap::ArgAction::Set, num_args = 0..=1, default_missing_value = "true")]
     pub store_container_labels: bool,
 
     /// Comma-separated container labels to export when store_container_labels
     /// is false
-    #[arg(long, default_value = "")]
+    #[arg(long = "whitelisted_container_labels", alias = "whitelisted-container-labels", default_value = "")]
     pub whitelisted_container_labels: String,
 
     /// Comma-separated environment variable keys to export
-    #[arg(long, default_value = "")]
+    #[arg(long = "env_metadata_whitelist", alias = "env-metadata-whitelist", default_value = "")]
     pub env_metadata_whitelist: String,
 
     /// containerd endpoint
@@ -70,7 +72,7 @@ pub struct Args {
     pub containerd: String,
 
     /// containerd namespace
-    #[arg(long, default_value = "k8s.io")]
+    #[arg(long = "containerd-namespace", alias = "containerd_namespace", default_value = "k8s.io")]
     pub containerd_namespace: String,
 
     /// CRI-O endpoint
@@ -79,25 +81,25 @@ pub struct Args {
 
     /// PEM certificate chain (leaf first) to serve HTTPS with; needs
     /// --tls-key-file. Re-read when the file is replaced. Empty = plain HTTP
-    #[arg(long, default_value = "")]
+    #[arg(long = "tls-cert-file", alias = "tls_cert_file", default_value = "")]
     pub tls_cert_file: String,
 
     /// PEM private key for --tls-cert-file
-    #[arg(long, default_value = "")]
+    #[arg(long = "tls-key-file", alias = "tls_key_file", default_value = "")]
     pub tls_key_file: String,
 
     /// File of accepted bearer tokens, one per line (`#` comments). When set,
     /// every path except /healthz, /-/healthy and /-/ready needs
     /// `Authorization: Bearer <token>`. Re-read when the file changes.
     /// Empty = no auth
-    #[arg(long, default_value = "")]
+    #[arg(long = "bearer-token-file", alias = "bearer_token_file", default_value = "")]
     pub bearer_token_file: String,
 }
 
 /// Accepts Go-style single-dash long flags: `-port 8080` -> `--port 8080`.
-#[cfg(target_os = "linux")]
-fn go_style_argv() -> Vec<String> {
-    std::env::args()
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn go_style_argv(argv: impl IntoIterator<Item = String>) -> Vec<String> {
+    argv.into_iter()
         .enumerate()
         .map(|(i, a)| {
             if i > 0
@@ -130,7 +132,7 @@ fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    let args = Args::parse_from(go_style_argv());
+    let args = Args::parse_from(go_style_argv(std::env::args()));
 
     let cfg = cadvisor_manager::ManagerConfig {
         housekeeping_interval: parse_duration(&args.housekeeping_interval, "housekeeping_interval")?,
@@ -246,4 +248,84 @@ fn main() -> anyhow::Result<()> {
 fn main() {
     eprintln!("cadvisor-rs {CADVISOR_VERSION}: Linux only (cgroup v2 required)");
     std::process::exit(1);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(argv: &[&str]) -> Args {
+        let argv = std::iter::once("cadvisor").chain(argv.iter().copied()).map(String::from);
+        Args::try_parse_from(go_style_argv(argv)).unwrap()
+    }
+
+    #[test]
+    fn upstream_argv() {
+        let a = parse(&[
+            "-listen_ip", "0.0.0.0",
+            "-port", "9096",
+            "-housekeeping_interval", "10s",
+            "-max_housekeeping_interval=15s",
+            "-allow_dynamic_housekeeping=false",
+            "-global_housekeeping_interval", "2m",
+            "-storage_duration", "5m",
+            "-disable_metrics", "percpu,disk",
+            "-enable_metrics=cpu",
+            "-store_container_labels=false",
+            "-whitelisted_container_labels", "io.kubernetes.pod.name",
+            "-env_metadata_whitelist", "FOO",
+            "-containerd", "/run/c.sock",
+            "-containerd-namespace", "moby",
+            "-crio", "/run/crio.sock",
+        ]);
+        assert_eq!(a.listen_ip, "0.0.0.0");
+        assert_eq!(a.port, 9096);
+        assert_eq!(a.housekeeping_interval, "10s");
+        assert_eq!(a.max_housekeeping_interval, "15s");
+        assert!(!a.allow_dynamic_housekeeping);
+        assert_eq!(a.global_housekeeping_interval, "2m");
+        assert_eq!(a.storage_duration, "5m");
+        assert_eq!(a.disable_metrics, "percpu,disk");
+        assert_eq!(a.enable_metrics, "cpu");
+        assert!(!a.store_container_labels);
+        assert_eq!(a.whitelisted_container_labels, "io.kubernetes.pod.name");
+        assert_eq!(a.env_metadata_whitelist, "FOO");
+        assert_eq!(a.containerd, "/run/c.sock");
+        assert_eq!(a.containerd_namespace, "moby");
+        assert_eq!(a.crio, "/run/crio.sock");
+    }
+
+    #[test]
+    fn kebab_aliases_still_work() {
+        // stormcos's golden argv.
+        let a = parse(&["--port", "9096", "--listen-ip", "0.0.0.0"]);
+        assert_eq!((a.port, a.listen_ip.as_str()), (9096, "0.0.0.0"));
+        let a = parse(&[
+            "--housekeeping-interval", "2s",
+            "--allow-dynamic-housekeeping", "false",
+            "--containerd_namespace", "x",
+            "--tls_cert_file", "c",
+            "--tls-key-file", "k",
+        ]);
+        assert_eq!(a.housekeeping_interval, "2s");
+        assert!(!a.allow_dynamic_housekeeping);
+        assert_eq!(a.containerd_namespace, "x");
+        assert_eq!((a.tls_cert_file.as_str(), a.tls_key_file.as_str()), ("c", "k"));
+    }
+
+    #[test]
+    fn bare_bool_means_true() {
+        let a = parse(&["-store_container_labels", "-allow_dynamic_housekeeping", "-port", "1"]);
+        assert!(a.store_container_labels && a.allow_dynamic_housekeeping);
+        assert_eq!(a.port, 1);
+    }
+
+    #[test]
+    fn defaults() {
+        let a = parse(&[]);
+        assert_eq!(a.listen_ip, "");
+        assert_eq!(a.port, 8080);
+        assert_eq!(a.containerd_namespace, "k8s.io");
+        assert!(a.store_container_labels && a.allow_dynamic_housekeeping);
+    }
 }
