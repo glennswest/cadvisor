@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const SA_DIR: &str = "/var/run/secrets/kubernetes.io/serviceaccount";
 
 /// cadvisor's port on a stormcos node (`argv = ["--port", "9096", …]` in
-/// stormcentral `components/stormcos.toml`).
+/// cadvisor's entry in stormcentral's component registry).
 pub const CADVISOR_PORT: u16 = 9096;
 
 /// stormd's API in cadvisor's container: a service golden's port + 100.

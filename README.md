@@ -185,14 +185,17 @@ meanwhile).
 | Where | Port | Source |
 |---|---|---|
 | Upstream / RPM default | 8080 | `--port` default |
-| stormcos node | 9096 | `argv = ["--port", "9096", "--listen-ip", "0.0.0.0"]` in `stormcentral/components/stormcos.toml` and `stormcos/deploy/build-goldens.sh`. 9095 belongs to stormvm. |
+| stormcos node | 9096 | `argv = ["--port", "9096", "--listen-ip", "0.0.0.0"]` in cadvisor's entry in stormcentral's component registry (its database; `stormcentral component export`). 9095 belongs to stormvm. |
 | stormcos ingress | `cadvisor.storm1.g8.lo` → `127.0.0.1:9096` | HTTPRoute in `stormcos/deploy/manifests/85-routes.yaml`, served by stormlb. It is unauthenticated, and stormcos#143 drops it. stormlb cannot reach a TLS-only backend (stormlb#13). |
 
 ## How it ships
 
 **As a stormcos golden.** cadvisor is a `kind = "service"` component in
-`stormcentral/components/stormcos.toml`. stormcos's
-`deploy/build-goldens.sh` (`service_golden`) builds it with
+stormcentral's component registry. The registry is stormcentral's database
+(stormcentral#185): `stormcentral component export` shows the entry and
+`stormcentral component edit cadvisor --set …` changes it.
+`stormcentral/components/stormcos.toml` is only the seed and is not read
+again. `stormcentral component build cadvisor` builds it from that entry with
 `cargo build --release --target x86_64-unknown-linux-musl`. It puts the static
 binary at `/usr/sbin/cadvisor` in a `stormdbase` root under `stormd`, with a
 `/healthz` probe and the argv above. The build produces three goldens:

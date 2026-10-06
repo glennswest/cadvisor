@@ -51,7 +51,7 @@ What it touches at run time (not edges in that graph):
 
 | | How | Source |
 |---|---|---|
-| **stormd** | PID 1 of its container: starts `cadvisor --port 9096 --listen-ip 0.0.0.0`, probes `/healthz` | `stormcentral/components/stormcos.toml` |
+| **stormd** | PID 1 of its container: starts `cadvisor --port 9096 --listen-ip 0.0.0.0`, probes `/healthz` | cadvisor's entry in stormcentral's component registry (its database) |
 | **stormpump** | writes the cgroups cadvisor reads; `boot.d/40-services` has `start cadvisor` | `stormcos/deploy/build-goldens.sh` |
 | **stormlb** | routes `cadvisor.storm1.g8.lo` → `127.0.0.1:9096` | `stormcos/deploy/manifests/85-routes.yaml` |
 | containerd / CRI-O | optional metadata over their unix sockets | `crates/cadvisor-runtime` |
@@ -172,8 +172,9 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 
 ## How it ships and is operated
 
-- **stormcos golden, `kind = "service"`.** `stormcos/deploy/build-goldens.sh`
-  builds `x86_64-unknown-linux-musl`, puts it at `/usr/sbin/cadvisor` under
+- **stormcos golden, `kind = "service"`.** stormcentral builds it from its
+  component registry entry (database, not `components/stormcos.toml`):
+  `x86_64-unknown-linux-musl`, puts it at `/usr/sbin/cadvisor` under
   `stormd`. Three goldens: `cadvisor` (32M, system1), `cadvisor-logs`
   (system1), `cadvisor-data` (data1, at `/var/lib/cadvisor`).
 - **How it starts**: stormpump `boot.d/40-services` → `start cadvisor`. The

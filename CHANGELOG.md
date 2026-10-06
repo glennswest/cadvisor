@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### 2026-10-06
+- **docs:** argv, port and the golden recipe come from stormcentral's component registry, which lives in its database (stormcentral#185). `components/stormcos.toml` is only the seed, and service goldens are built by stormcentral, not stormcos's `build-goldens.sh` (#20, stormcos#65). Updated README ports and "How it ships", CLAUDE.md, the presentation and the `test/src/env.rs` comment. Values checked against `stormcentral component export` (unchanged: 9096, `/healthz`, `--port 9096 --listen-ip 0.0.0.0`).
 - **chore:** Makefile no longer builds as `root@dev.g8.lo` (#11). Removed `REMOTE`, `sync`, `test-linux`, `build-linux` and the `fixtures` stub. `package` now does a local release build and nfpm `.rpm` + `.deb` (runnable as `sc-build 'make package'`). `conformance` runs `conformance/diff-metrics.sh` and `diff-api.py`. `diff-metrics.sh` writes its scratch files to a private `mktemp -d` under `$TMPDIR` instead of fixed `/tmp` paths.
 - **docs:** README Makefile note; presentation and CLAUDE.md drop #11.
 - **fix:** Machine info is refreshed (#18). New flag `-update_machine_info_interval` (alias `--update-machine-info-interval`, default `5m0s`, as upstream) re-reads it, and the disk map is re-scanned as soon as an `io.stat` `major:minor` is missing from it, once per new device. Hot-attached volumes (stormblock ublk / nvme-tcp) now get `device="/dev/<name>"`, so they are no longer collapsed into one `device=""` series and dropped. Tests: fixture `/sys/block` gaining devices, unmapped-key detection, flag parsing.

@@ -20,11 +20,14 @@ enrichment. Seven crates under `crates/` — see README.md.
 
 ## How it ships
 
-- **stormcos golden (current).** A `service` component in
-  `stormcentral/components/stormcos.toml`, built by
-  `stormcos/deploy/build-goldens.sh` (`service_golden cadvisor 32M … 9096 …
-  /healthz '"--port", "9096", "--listen-ip", "0.0.0.0"'`) as a static
-  `x86_64-unknown-linux-musl` binary under `stormd`. Goldens: `cadvisor`
+- **stormcos golden (current).** A `service` component in stormcentral's
+  component registry, which lives in stormcentral's database
+  (stormcentral#185; `stormcentral component export` shows it, `component
+  edit cadvisor --set …` changes it; `components/stormcos.toml` is only the
+  seed and is not read again). Entry: port 9096, health `/healthz`, argv
+  `["--port", "9096", "--listen-ip", "0.0.0.0"]`, golden 32M. stormcentral
+  builds it from that entry (stormdbase + the static
+  `x86_64-unknown-linux-musl` binary under `stormd` + the entry's config text). Goldens: `cadvisor`
   (system1), `cadvisor-logs` (system1), `cadvisor-data` (data1). Authority for
   the process: `stormcos/docs/goldens.md`. A commit here reaches a node only
   when a golden is built (`stormcentral component build cadvisor`) and a
