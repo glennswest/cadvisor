@@ -206,9 +206,16 @@ fn topology() -> (Vec<v1::Node>, i64) {
     (nodes, num_cpus)
 }
 
-fn disk_map() -> std::collections::BTreeMap<String, v1::DiskInfo> {
+/// Block devices from `/sys/block`, keyed by `"major:minor"`. Re-read when
+/// devices are attached after startup (stormblock ublk / nvme-tcp volumes).
+pub fn disk_map() -> std::collections::BTreeMap<String, v1::DiskInfo> {
+    disk_map_at(Path::new("/sys/block"))
+}
+
+/// [`disk_map`] over any `/sys/block`-shaped directory.
+pub fn disk_map_at(sys_block: &Path) -> std::collections::BTreeMap<String, v1::DiskInfo> {
     let mut out = std::collections::BTreeMap::new();
-    let Ok(entries) = std::fs::read_dir("/sys/block") else { return out };
+    let Ok(entries) = std::fs::read_dir(sys_block) else { return out };
     for e in entries.flatten() {
         let name = e.file_name().to_string_lossy().to_string();
         // cadvisor's block-device filter (verified against real v0.49.2
@@ -301,4 +308,36 @@ pub fn machine_info(fs: &FsService, timestamp: GoTime) -> Result<v1::MachineInfo
         instance_type: v1::UNKNOWN_INSTANCE.to_string(),
         instance_id: v1::UNNAMED_INSTANCE.to_string(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn add_disk(root: &Path, name: &str, dev: &str, sectors: u64) {
+        let d = root.join(name);
+        std::fs::create_dir_all(d.join("queue")).unwrap();
+        std::fs::write(d.join("dev"), format!("{dev}\n")).unwrap();
+        std::fs::write(d.join("size"), format!("{sectors}\n")).unwrap();
+        std::fs::write(d.join("queue/scheduler"), "[none] mq-deadline\n").unwrap();
+    }
+
+    #[test]
+    fn disk_map_sees_devices_added_later() {
+        let root = std::env::temp_dir().join(format!("cadvisor-diskmap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        add_disk(&root, "vda", "253:0", 2048);
+        add_disk(&root, "loop0", "7:0", 8);
+        let before = disk_map_at(&root);
+        assert_eq!(before.keys().collect::<Vec<_>>(), ["253:0"]);
+        assert_eq!(before["253:0"].size, 2048 * 512);
+
+        add_disk(&root, "ublkb0", "259:1", 100);
+        add_disk(&root, "nvme1n1", "259:2", 200);
+        let after = disk_map_at(&root);
+        assert_eq!(after["259:1"].name, "ublkb0");
+        assert_eq!(after["259:2"].name, "nvme1n1");
+        assert_eq!(after.len(), 3);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
 }

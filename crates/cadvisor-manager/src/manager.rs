@@ -1,7 +1,7 @@
 //! The manager: container registry, discovery, and per-container adaptive
 //! housekeeping (Linux only).
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, SystemTime};
 
@@ -30,6 +30,9 @@ pub struct ManagerConfig {
     pub max_housekeeping_interval: Duration,
     pub allow_dynamic_housekeeping: bool,
     pub global_housekeeping_interval: Duration,
+    /// How often machine info (incl. the disk map) is re-read; upstream
+    /// `-update_machine_info_interval`.
+    pub update_machine_info_interval: Duration,
     pub storage_duration: Duration,
     pub cadvisor_version: String,
     pub containerd_socket: String,
@@ -45,6 +48,7 @@ impl Default for ManagerConfig {
             max_housekeeping_interval: Duration::from_secs(60),
             allow_dynamic_housekeeping: true,
             global_housekeeping_interval: Duration::from_secs(60),
+            update_machine_info_interval: Duration::from_secs(300),
             storage_duration: Duration::from_secs(120),
             cadvisor_version: env!("CARGO_PKG_VERSION").to_string(),
             containerd_socket: "/run/containerd/containerd.sock".to_string(),
@@ -83,6 +87,9 @@ pub struct Manager {
     fs: FsService,
     containers: RwLock<HashMap<String, Arc<ContainerHandle>>>,
     machine_info: RwLock<v1::MachineInfo>,
+    /// `major:minor` keys seen in `io.stat` but missing from the disk map
+    /// since the last re-scan, so each new device triggers one re-scan.
+    disk_misses: Mutex<HashSet<String>>,
     version_info: v1::VersionInfo,
     events: Mutex<Vec<Arc<v1::Event>>>,
     event_tx: tokio::sync::broadcast::Sender<Arc<v1::Event>>,
@@ -167,6 +174,7 @@ impl Manager {
             fs,
             containers: RwLock::new(HashMap::new()),
             machine_info: RwLock::new(machine_info),
+            disk_misses: Mutex::new(HashSet::new()),
             version_info,
             events: Mutex::new(Vec::new()),
             event_tx: tokio::sync::broadcast::channel(1024).0,
@@ -181,6 +189,38 @@ impl Manager {
 
     pub fn machine_info(&self) -> v1::MachineInfo {
         self.machine_info.read().unwrap().clone()
+    }
+
+    /// Re-reads machine info, as upstream does every
+    /// `-update_machine_info_interval`. On error the old info is kept.
+    pub fn refresh_machine_info(&self) {
+        match machine::machine_info(&self.fs, GoTime::now()) {
+            Ok(mi) => {
+                *self.machine_info.write().unwrap() = mi;
+                self.disk_misses.lock().unwrap().clear();
+            }
+            Err(e) => tracing::warn!(error = %e, "machine info refresh failed"),
+        }
+    }
+
+    /// Re-scans `/sys/block` when `io.stat` names a device the disk map does
+    /// not know (a volume attached after the last scan), once per new device.
+    fn note_disks(&self, entries: &[v1::PerDiskStats]) {
+        let unknown = unknown_disks(entries, &self.machine_info.read().unwrap().disk_map);
+        if unknown.is_empty() {
+            return;
+        }
+        {
+            let mut misses = self.disk_misses.lock().unwrap();
+            let before = misses.len();
+            misses.extend(unknown);
+            if misses.len() == before {
+                return;
+            }
+        }
+        let map = machine::disk_map();
+        tracing::debug!(devices = map.len(), "disk map re-scanned");
+        self.machine_info.write().unwrap().disk_map = map;
     }
 
     pub fn version_info(&self) -> v1::VersionInfo {
@@ -278,6 +318,19 @@ impl Manager {
                     CgroupEvent::Added(name) => mgr.add_container(&name, true).await,
                     CgroupEvent::Removed(name) => mgr.remove_container(&name),
                 }
+            }
+        });
+
+        // Machine info refresh (upstream -update_machine_info_interval).
+        let mgr = Arc::clone(self);
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(mgr.cfg.update_machine_info_interval);
+            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            tick.tick().await;
+            loop {
+                tick.tick().await;
+                let m = Arc::clone(&mgr);
+                let _ = tokio::task::spawn_blocking(move || m.refresh_machine_info()).await;
             }
         });
 
@@ -503,6 +556,7 @@ impl Manager {
     fn sample(&self, handle: &ContainerHandle) -> Result<v1::ContainerStats, ManagerError> {
         let name = handle.name();
         let mut stats = self.reader.read_stats(name, GoTime::now())?;
+        self.note_disks(&stats.disk_io.io_service_bytes);
         if handle.reports_network.load(std::sync::atomic::Ordering::Relaxed) {
             if let Some(pid) = *handle.init_pid.read().unwrap() {
                 if let Ok(content) = std::fs::read_to_string(format!("/proc/{pid}/net/dev")) {
@@ -817,5 +871,34 @@ impl Manager {
     /// Live event stream (for `?stream=true`).
     pub fn subscribe_events(&self) -> tokio::sync::broadcast::Receiver<Arc<v1::Event>> {
         self.event_tx.subscribe()
+    }
+}
+
+/// `major:minor` keys of unnamed `io.stat` entries the disk map lacks.
+fn unknown_disks(entries: &[v1::PerDiskStats], map: &BTreeMap<String, v1::DiskInfo>) -> Vec<String> {
+    entries
+        .iter()
+        .filter(|e| e.device.is_empty())
+        .map(|e| format!("{}:{}", e.major, e.minor))
+        .filter(|k| !map.contains_key(k))
+        .collect()
+}
+
+#[cfg(test)]
+mod disk_tests {
+    use super::*;
+
+    fn entry(major: u64, minor: u64) -> v1::PerDiskStats {
+        v1::PerDiskStats { major, minor, ..Default::default() }
+    }
+
+    #[test]
+    fn unknown_disks_lists_only_unmapped() {
+        let mut map = BTreeMap::new();
+        map.insert("253:0".to_string(), v1::DiskInfo::default());
+        let entries = [entry(253, 0), entry(259, 1), entry(259, 2)];
+        assert_eq!(unknown_disks(&entries, &map), ["259:1", "259:2"]);
+        let named = v1::PerDiskStats { device: "/dev/x".into(), ..entry(8, 0) };
+        assert!(unknown_disks(&[named], &map).is_empty());
     }
 }

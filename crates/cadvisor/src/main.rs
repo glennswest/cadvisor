@@ -42,6 +42,10 @@ pub struct Args {
     #[arg(long = "global_housekeeping_interval", alias = "global-housekeeping-interval", default_value = "1m0s")]
     pub global_housekeeping_interval: String,
 
+    /// Interval between machine info updates (disk map, filesystems, memory)
+    #[arg(long = "update_machine_info_interval", alias = "update-machine-info-interval", default_value = "5m0s")]
+    pub update_machine_info_interval: String,
+
     /// How long to keep data stored
     #[arg(long = "storage_duration", alias = "storage-duration", default_value = "2m0s")]
     pub storage_duration: String,
@@ -144,6 +148,10 @@ fn main() -> anyhow::Result<()> {
         global_housekeeping_interval: parse_duration(
             &args.global_housekeeping_interval,
             "global_housekeeping_interval",
+        )?,
+        update_machine_info_interval: parse_duration(
+            &args.update_machine_info_interval,
+            "update_machine_info_interval",
         )?,
         storage_duration: parse_duration(&args.storage_duration, "storage_duration")?,
         cadvisor_version: CADVISOR_VERSION.to_string(),
@@ -269,6 +277,7 @@ mod tests {
             "-allow_dynamic_housekeeping=false",
             "-global_housekeeping_interval", "2m",
             "-storage_duration", "5m",
+            "-update_machine_info_interval", "30s",
             "-disable_metrics", "percpu,disk",
             "-enable_metrics=cpu",
             "-store_container_labels=false",
@@ -285,6 +294,7 @@ mod tests {
         assert!(!a.allow_dynamic_housekeeping);
         assert_eq!(a.global_housekeeping_interval, "2m");
         assert_eq!(a.storage_duration, "5m");
+        assert_eq!(a.update_machine_info_interval, "30s");
         assert_eq!(a.disable_metrics, "percpu,disk");
         assert_eq!(a.enable_metrics, "cpu");
         assert!(!a.store_container_labels);
@@ -326,6 +336,7 @@ mod tests {
         assert_eq!(a.listen_ip, "");
         assert_eq!(a.port, 8080);
         assert_eq!(a.containerd_namespace, "k8s.io");
+        assert_eq!(a.update_machine_info_interval, "5m0s");
         assert!(a.store_container_labels && a.allow_dynamic_housekeeping);
     }
 }
