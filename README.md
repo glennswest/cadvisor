@@ -92,29 +92,33 @@ It is configured by flags only: there is no config file, and there are no
 environment variables apart from `RUST_LOG`. Log level comes from `RUST_LOG`
 (tracing `EnvFilter` syntax, default `info`), and logs go to stderr.
 
-Go-style single-dash flags are accepted (`-port 8080` is read as
-`--port 8080`). **The flag names are the kebab-case names below, not
-upstream's underscore names.** `-listen_ip` is currently rejected (#9). Durations
-use humantime syntax (`1s`, `1m0s`, `2m`). Booleans take a value
-(`--store-container-labels=false`).
+The flag names are upstream's (#9): an upstream command line such as
+`cadvisor -listen_ip 0.0.0.0 -housekeeping_interval 10s` works as is. Every
+flag also answers to the other spelling (`--listen-ip`,
+`--containerd_namespace`, `--tls_cert_file`), so existing kebab-case command
+lines, including the stormcos golden's `--listen-ip`, keep working. Go-style
+single-dash flags are accepted (`-port 8080` is read as `--port 8080`).
+Durations use humantime syntax (`1s`, `1m0s`, `2m`). Booleans take a value
+(`-store_container_labels=false`); given bare (`-store_container_labels`) they
+mean `true`, as in Go.
 
-| Flag | Default | Effect |
+| Flag (upstream spelling) | Default | Effect |
 |---|---|---|
-| `--listen-ip` | `""` (all interfaces, `0.0.0.0`) | Bind address |
-| `--port` | `8080` | Bind port |
-| `--housekeeping-interval` | `1s` | Starting per-container stats interval |
-| `--max-housekeeping-interval` | `60s` | Longest interval dynamic backoff reaches |
-| `--allow-dynamic-housekeeping` | `true` | Back off idle containers |
-| `--global-housekeeping-interval` | `1m0s` | Full cgroup-tree rediscovery sweep |
-| `--storage-duration` | `2m0s` | How long samples stay in the in-memory ring buffer |
-| `--disable-metrics` | `""` | Comma-separated metric groups to leave out of `/metrics` |
-| `--enable-metrics` | `""` | If set, only these groups are emitted. It overrides `--disable-metrics`. |
-| `--store-container-labels` | `true` | Export every runtime label as a `container_label_*` Prometheus label |
-| `--whitelisted-container-labels` | `""` | Labels to export when `--store-container-labels=false` |
-| `--env-metadata-whitelist` | `""` | **Accepted and ignored** (#10) |
-| `--containerd` | `/run/containerd/containerd.sock` | containerd socket |
-| `--containerd-namespace` | `k8s.io` | containerd namespace |
-| `--crio` | `/var/run/crio/crio.sock` | CRI-O socket |
+| `-listen_ip` | `""` (all interfaces, `0.0.0.0`) | Bind address |
+| `-port` | `8080` | Bind port |
+| `-housekeeping_interval` | `1s` | Starting per-container stats interval |
+| `-max_housekeeping_interval` | `60s` | Longest interval dynamic backoff reaches |
+| `-allow_dynamic_housekeeping` | `true` | Back off idle containers |
+| `-global_housekeeping_interval` | `1m0s` | Full cgroup-tree rediscovery sweep |
+| `-storage_duration` | `2m0s` | How long samples stay in the in-memory ring buffer |
+| `-disable_metrics` | `""` | Comma-separated metric groups to leave out of `/metrics` |
+| `-enable_metrics` | `""` | If set, only these groups are emitted. It overrides `-disable_metrics`. |
+| `-store_container_labels` | `true` | Export every runtime label as a `container_label_*` Prometheus label |
+| `-whitelisted_container_labels` | `""` | Labels to export when `-store_container_labels=false` |
+| `-env_metadata_whitelist` | `""` | **Accepted and ignored** (#10) |
+| `-containerd` | `/run/containerd/containerd.sock` | containerd socket |
+| `-containerd-namespace` | `k8s.io` | containerd namespace |
+| `-crio` | `/var/run/crio/crio.sock` | CRI-O socket |
 | `--tls-cert-file` | `""` (plain HTTP) | PEM certificate chain, leaf first. With it the port speaks HTTPS only. Needs `--tls-key-file`. Not in upstream. |
 | `--tls-key-file` | `""` | PEM private key for `--tls-cert-file` |
 | `--bearer-token-file` | `""` (no auth) | Accepted tokens, one per line, `#` comments. Not in upstream. |

@@ -193,8 +193,6 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 
 - **TLS and tokens on in the stormcos golden**: a stormcert certificate for
   cadvisor, a token file, and https liveness (stormcos#143). The code is in (#4).
-- **Upstream underscore flag names** (`-listen_ip`, `-housekeeping_interval`)
-  — rejected today (#9).
 - **`--env-metadata-whitelist`** — parsed, ignored (#10).
 - **Pod metadata on stormcos** — stormpump pods carry only `id` (#3); the
   identity source is rustkube-node#84. Bare `pod`/`namespace` labels, beyond
@@ -230,7 +228,6 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 | #18 | machine info never refreshed | P2; hot-attached volumes get `device=""` |
 | #15 | per-VM stats keyed to the VMI | P2; not started (asked by stormconsole#14) |
 | #19 | test suites need https + a token | P2; after stormcos#143 turns TLS/auth on in the golden (#4, done) |
-| #9 | upstream underscore flag names | P2 |
 | #10 / #11 | env whitelist; Makefile `root@dev` targets | P3 |
 | #5 | must-gather collector in stormcos_qa | P3 |
 | #16 | decide: bare `pod`/`namespace` labels | P3; owner's call |
