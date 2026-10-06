@@ -34,6 +34,11 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-10-06 — #3 picked up and re-checked: discovery, cgroup v2 stats and
+  the containerd/CRI-O labels are done; the only remaining work (identity for
+  stormpump pods) is blocked on rustkube-node#84, still open with no shape
+  chosen and no commits (checked rustkube-node's last 40 commits). Item
+  proposed `--after rustkube-node#84`; no code change, no golden.
 - 2026-09-28 — docs refresh since 2026-09-18, third pass: README (machine
   info read once, #18; #12 node-run status; suites plain HTTP), deck issue
   table (#4 done, #18, #19), this file. New issue: #19.
@@ -128,8 +133,8 @@ enrichment. Seven crates under `crates/` — see README.md.
 
 ### Open issues (validated 2026-09-28; priorities set in stormcentral)
 - #12 P1 test container: built and verified on dev; node run blocked.
-- #3 P1 pod metadata (see above); the identity source for stormpump pods is
-  rustkube-node#84.
+- #3 P1 pod metadata (see above); blocked on rustkube-node#84 (the identity
+  source for stormpump pods; open, not started as of 2026-10-06).
 - #18 P2 machine info never refreshed (hot-attached volumes lose disk IO).
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
 - #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — not started;
