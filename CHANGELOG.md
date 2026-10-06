@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### 2026-10-06
+- **feat:** `-env_metadata_whitelist` is honoured (#10). For containerd containers, `process.env` is read from the OCI spec, and every variable whose key starts with a whitelisted prefix (upstream's rule) fills `spec.envs` (API) and `container_env_<key>` (`/metrics`). As upstream, env labels are left out when `-store_container_labels=false`, and CRI-O containers get none (its inspect has no env). Tests: prefix matching, OCI spec parsing, label gating.
+- **docs:** README env metadata section and flag table; presentation and CLAUDE.md drop #10.
 - **docs:** argv, port and the golden recipe come from stormcentral's component registry, which lives in its database (stormcentral#185). `components/stormcos.toml` is only the seed, and service goldens are built by stormcentral, not stormcos's `build-goldens.sh` (#20, stormcos#65). Updated README ports and "How it ships", CLAUDE.md, the presentation and the `test/src/env.rs` comment. Values checked against `stormcentral component export` (unchanged: 9096, `/healthz`, `--port 9096 --listen-ip 0.0.0.0`).
 - **chore:** Makefile no longer builds as `root@dev.g8.lo` (#11). Removed `REMOTE`, `sync`, `test-linux`, `build-linux` and the `fixtures` stub. `package` now does a local release build and nfpm `.rpm` + `.deb` (runnable as `sc-build 'make package'`). `conformance` runs `conformance/diff-metrics.sh` and `diff-api.py`. `diff-metrics.sh` writes its scratch files to a private `mktemp -d` under `$TMPDIR` instead of fixed `/tmp` paths.
 - **docs:** README Makefile note; presentation and CLAUDE.md drop #11.

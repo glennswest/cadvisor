@@ -58,7 +58,16 @@ A slide deck on its purpose and functionality is in
   as upstream.
 - **TLS and bearer tokens (optional, #4).** Off by default, as upstream.
   See [TLS and auth](#tls-and-auth).
-- **Not implemented:** `--env-metadata-whitelist` (#10), protobuf responses, and upstream's
+- **Env metadata (#10).** With `-env_metadata_whitelist APP_,TZ`, each
+  environment variable of a containerd container whose key starts with one of
+  those prefixes is kept in the spec's `envs` (`/api/v1.x`, `/api/v2.x`). It is
+  also exported as a `container_env_<key>` label, when
+  `-store_container_labels` is true, as upstream. The environment is read from
+  containerd's OCI spec (`process.env`). CRI-O containers get none, because
+  CRI-O's inspect API has no environment; upstream collects it only for
+  containerd and docker too. stormpump pods have no runtime metadata at all
+  (#3).
+- **Not implemented:** protobuf responses, and upstream's
   default-disabled metric groups (tcp/udp/advtcp, sched, hugetlb, perf,
   resctrl, …). The names of those groups are accepted in the flags and emit
   nothing, which is what a default upstream build does.
@@ -119,7 +128,7 @@ mean `true`, as in Go.
 | `-enable_metrics` | `""` | If set, only these groups are emitted. It overrides `-disable_metrics`. |
 | `-store_container_labels` | `true` | Export every runtime label as a `container_label_*` Prometheus label |
 | `-whitelisted_container_labels` | `""` | Labels to export when `-store_container_labels=false` |
-| `-env_metadata_whitelist` | `""` | **Accepted and ignored** (#10) |
+| `-env_metadata_whitelist` | `""` | Comma-separated env var key prefixes exported as `envs` / `container_env_*` (containerd only, as upstream) |
 | `-containerd` | `/run/containerd/containerd.sock` | containerd socket |
 | `-containerd-namespace` | `k8s.io` | containerd namespace |
 | `-crio` | `/var/run/crio/crio.sock` | CRI-O socket |

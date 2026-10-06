@@ -194,7 +194,6 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 
 - **TLS and tokens on in the stormcos golden**: a stormcert certificate for
   cadvisor, a token file, and https liveness (stormcos#143). The code is in (#4).
-- **`--env-metadata-whitelist`** — parsed, ignored (#10).
 - **Pod metadata on stormcos** — stormpump pods carry only `id` (#3); the
   identity source is rustkube-node#84. Bare `pod`/`namespace` labels, beyond
   upstream, are an open decision (#16).
@@ -226,6 +225,5 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 | #3 | pod metadata | P1; no labels for stormpump pods (waits on rustkube-node#84) |
 | #15 | per-VM stats keyed to the VMI | P2; blocked on rustkube-node#84 (labels), stormvm#16 (network) |
 | #19 | test suites need https + a token | P2; after stormcos#143 turns TLS/auth on in the golden (#4, done) |
-| #10 | env whitelist | P3 |
 | #5 | must-gather collector in stormcos_qa | P3 |
 | #16 | decide: bare `pod`/`namespace` labels | P3; owner's call |
