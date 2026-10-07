@@ -37,6 +37,12 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-10-06 — #5 must-gather collector: `gather/cadvisor/status.sh` in
+  stormcos_qa (391cf16; README row + CHANGELOG there). Verified with sc-build:
+  built binary on :19396, collector fetched at 391cf16, `QA_SSH='sh -c'` →
+  exit 0, 397 lines, all 14 sections (version, 5419 container_* series,
+  containers, /sys/block); unreachable stormd reported, not fatal. QA tests
+  stay in `test/` (#12). #5 closed.
 - 2026-10-06 — #10 `-env_metadata_whitelist`: containerd OCI `process.env` →
   prefix-filtered `spec.envs` → `container_env_*` (only with
   store_container_labels, as upstream). CRI-O none (no env in its inspect).
@@ -105,12 +111,6 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- 2026-10-06 — #5 must-gather collector: `gather/cadvisor/status.sh` in
-  stormcos_qa (directory owned by this component per its STANDARD; fastetcd
-  did the same). HTTP from the gather host to `$QA_NODE_IP:9096` (cadvisor)
-  and `:9196` (stormd), node-side cgroup/block listing over `$QA_SSH`.
-  Tests stay in `test/` (#12). Verify via sc-build: start the built binary,
-  run the collector with `QA_SSH='sh -c'` against it.
 - 2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
   Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
   `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
@@ -178,5 +178,4 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — blocked on
   rustkube-node#84 (labels), stormvm#16 (network; SLIRP today).
 - #19 P2 test suites need https + token (proposed after stormcos#143).
-- #5 P3 must-gather collector only
-  (#12 covers the tests).
+

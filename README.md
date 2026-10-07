@@ -281,6 +281,11 @@ sc-build 'T=$(cargo metadata --format-version 1 --no-deps | sed "s/.*\"target_di
 
 ## Tests on a node
 
+**must-gather:** stormcos_qa's `gather/cadvisor/status.sh` (owned here, #5)
+captures cadvisor's health, version, machine info, container list, events and
+self-metrics, stormd's view of the process and its log, and the node's cgroup
+and `/sys/block` trees, when a QA run fails.
+
 `test/` holds cadvisor's test container, per stormcentral's
 [`docs/test-standard.md`](https://github.com/glennswest/stormcentral/blob/main/docs/test-standard.md).
 stormcentral builds it (`test/build.sh`, then `podman build -f
