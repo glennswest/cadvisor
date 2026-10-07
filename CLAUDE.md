@@ -105,6 +105,12 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
+- 2026-10-06 — #5 must-gather collector: `gather/cadvisor/status.sh` in
+  stormcos_qa (directory owned by this component per its STANDARD; fastetcd
+  did the same). HTTP from the gather host to `$QA_NODE_IP:9096` (cadvisor)
+  and `:9196` (stormd), node-side cgroup/block listing over `$QA_SSH`.
+  Tests stay in `test/` (#12). Verify via sc-build: start the built binary,
+  run the collector with `QA_SSH='sh -c'` against it.
 - 2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
   Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
   `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
