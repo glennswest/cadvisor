@@ -178,4 +178,5 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — blocked on
   rustkube-node#84 (labels), stormvm#16 (network; SLIRP today).
 - #19 P2 test suites need https + token (proposed after stormcos#143).
+- #22 P3 v0.49.2 conformance diff not re-run since 2026-07-16 (nothing runs it).
 
