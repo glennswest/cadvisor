@@ -42,7 +42,7 @@ enrichment. Seven crates under `crates/` — see README.md.
   store_container_labels, as upstream). CRI-O none (no env in its inspect).
   `sc-build` on 78857db: 81 tests pass (new: `env_whitelist_is_a_prefix_match`,
   `oci_env`, `env_labels_follow_store_container_labels`). Not seen against a
-  live containerd. #10 closed; golden requested.
+  live containerd. #10 closed; golden golden-cadvisor-a6e1ff94c96c (stormcos#331).
 - 2026-10-06 — #20 docs: argv/port/recipe come from stormcentral's registry
   database (stormcentral#185), not `components/stormcos.toml`. Service goldens
   are built by stormcentral, not `build-goldens.sh`. Values checked with
