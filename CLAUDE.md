@@ -158,6 +158,19 @@ enrichment. Seven crates under `crates/` — see README.md.
   C2NR0Q2`, then medium; fix what they find; close #12. No
   `test/requires.toml` needed (no privileges or cluster reads); no
   `cadvisor-test` repo yet (stormcentral #601), so `test/` here runs.
+  **First node run, 80a8f63e07 (short, afb46a0, C2NR0Q2): 6 pass, 2 fail.**
+  It got past build, push and Job start. health, stormd-supervises, version,
+  machine, housekeeping and cleanup pass. `metrics` (no
+  `container_cpu_usage_seconds_total{id="/"}`) and `workload-discovered`
+  fail, for one cause: stormpump gives cadvisor's container a fresh sysfs
+  with an empty `/sys/fs/cgroup` (no cgroup2 bind in its boot.d unit,
+  stormcos `deploy/build-goldens.sh` `spec cadvisor`). So cadvisor saw only
+  `/`, with zero CPU. Filed **stormcos#520** (bind host /sys/fs/cgroup ro,
+  as stormdrive binds /sys). Here, c2e3c26: cadvisor refuses to start
+  without `cgroup.controllers` (upstream exits too). **No golden from
+  c2e3c26 until stormcos#520 ships** (said so on #520), or cadvisor would
+  stay down on nodes. #12 proposed `--after stormcos#520`; then re-run
+  short, then medium.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4, closed) is in the code but off unless flags are set;
