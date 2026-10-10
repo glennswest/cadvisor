@@ -138,7 +138,6 @@ fn topology() -> (Vec<v1::Node>, i64) {
                 .into_iter()
                 .map(|v| v as u64)
                 .collect(),
-            ..Default::default()
         };
         // node meminfo: "Node 0 MemTotal:       16342752 kB"
         if let Some(mi) = read_trim(format!("{base}/meminfo")) {

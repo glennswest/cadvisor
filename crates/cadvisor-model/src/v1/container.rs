@@ -854,9 +854,11 @@ mod tests {
 
     #[test]
     fn round_trip_preserves_value() {
-        let mut stats = ContainerStats::default();
-        stats.cpu = CpuStats {
-            usage: CpuUsage { total: 123, per_cpu: vec![100, 23], user: 60, system: 63 },
+        let mut stats = ContainerStats {
+            cpu: CpuStats {
+                usage: CpuUsage { total: 123, per_cpu: vec![100, 23], user: 60, system: 63 },
+                ..Default::default()
+            },
             ..Default::default()
         };
         stats.hugetlb.insert("2Mi".into(), HugetlbStats { usage: 1, max_usage: 0, failcnt: 0 });
