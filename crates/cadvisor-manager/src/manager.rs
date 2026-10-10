@@ -21,6 +21,19 @@ pub enum ManagerError {
     UnknownContainer(String),
     #[error(transparent)]
     Host(#[from] cadvisor_host::HostError),
+    #[error("{0} is not a cgroup v2 mount (no cgroup.controllers): cadvisor needs the host's unified cgroup tree there")]
+    NotCgroup2(String),
+}
+
+/// Upstream exits when its raw container factory cannot register; the same
+/// here, rather than serving a root with zero CPU and no subcontainers when
+/// `root` is an empty directory or a mount of something else.
+pub fn check_cgroup2(root: &str) -> Result<(), ManagerError> {
+    if std::path::Path::new(root).join("cgroup.controllers").is_file() {
+        Ok(())
+    } else {
+        Err(ManagerError::NotCgroup2(root.to_string()))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -158,6 +171,7 @@ fn read_os_release_pretty_name() -> String {
 
 impl Manager {
     pub fn new(cfg: ManagerConfig) -> Result<Self, ManagerError> {
+        check_cgroup2(&cfg.cgroup_root)?;
         let reader = CgroupReader::new(&cfg.cgroup_root);
         let fs = FsService::new()?;
         let machine_info = machine::machine_info(&fs, GoTime::now())?;
@@ -887,6 +901,23 @@ fn unknown_disks(entries: &[v1::PerDiskStats], map: &BTreeMap<String, v1::DiskIn
         .map(|e| format!("{}:{}", e.major, e.minor))
         .filter(|k| !map.contains_key(k))
         .collect()
+}
+
+#[cfg(test)]
+mod cgroup2_tests {
+    use super::*;
+
+    #[test]
+    fn a_root_without_cgroup_controllers_is_refused() {
+        let dir = std::env::temp_dir().join(format!("cadvisor-cg2-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let root = dir.to_str().unwrap().to_string();
+        let err = check_cgroup2(&root).unwrap_err().to_string();
+        assert!(err.contains("is not a cgroup v2 mount"), "{err}");
+        std::fs::write(dir.join("cgroup.controllers"), "cpu memory io pids\n").unwrap();
+        assert!(check_cgroup2(&root).is_ok());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }
 
 #[cfg(test)]
