@@ -153,6 +153,11 @@ enrichment. Seven crates under `crates/` — see README.md.
   refused connections on :5100. Other sessions' runs on C2NR0Q2 are failing
   its /readyz. C2NR0Q2 is the only test machine. Nothing to change in cadvisor;
   re-run once C2NR0Q2 is healthy.
+  2026-10-10: C2NR0Q2 passes other components' runs again (rustkube-node,
+  stormblock short). Now: `stormcentral test run cadvisor short --tag
+  C2NR0Q2`, then medium; fix what they find; close #12. No
+  `test/requires.toml` needed (no privileges or cluster reads); no
+  `cadvisor-test` repo yet (stormcentral #601), so `test/` here runs.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4, closed) is in the code but off unless flags are set;
