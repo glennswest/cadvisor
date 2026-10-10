@@ -20,7 +20,9 @@ A slide deck on its purpose and functionality is in
 - **Discovery.** It walks `/sys/fs/cgroup` and watches it with inotify, and
   sweeps the whole tree again every `--global-housekeeping-interval` (1m) as a
   safety net. Each cgroup becomes a container named by its path (`/`,
-  `/system.slice/…`, `/machine.slice/…`).
+  `/system.slice/…`, `/machine.slice/…`). If `/sys/fs/cgroup` is not a
+  cgroup v2 mount (no `cgroup.controllers`), it refuses to start, as
+  upstream exits when its raw factory cannot register.
 - **Stats.** Each container has its own housekeeping loop. It starts at
   `--housekeeping-interval` (1s) and, with `--allow-dynamic-housekeeping`,
   backs off to at most `--max-housekeeping-interval` (60s) while the
@@ -319,12 +321,14 @@ On the build box, `cd test && CADVISOR_BIN=<path to cadvisor> cargo test`
 runs the unit tests. It also runs `tests/harness.rs`, which starts the real
 binary and runs `short` and `medium` against it, with the pod tests skipped.
 
-**Status (2026-09-28):** the suites are verified on the build box: unit
-tests, the harness, and the image built by `test/build.sh` and podman. No node
-run has passed yet. C2NR0Q2, the only test machine, answers on its registry
-port (:5100) again. The furthest run (stormcentral `fe3fc66b32`) got as far as
-the image push and hit a broken pipe there (stormblock-registry#56, fixed in
-v0.24.1; not yet confirmed on C2NR0Q2). #12 stays open until a node run passes.
+**Status (2026-10-10):** the suites are verified on the build box: unit
+tests, the harness, and the image built by `test/build.sh`. The first node run
+(`short`, stormcentral run `80a8f63e07` on C2NR0Q2) reached the Job and
+found a real problem. cadvisor's stormcos container has no cgroup2 tree:
+stormpump gives it a fresh sysfs, so `/sys/fs/cgroup` is empty. cadvisor saw
+only `/`, with zero CPU, and never saw the workload pod. The fix, a read-only
+bind of the host's `/sys/fs/cgroup`, is stormcos#520. #12 stays open until
+`short` and `medium` pass on a node.
 
 The suites talk plain HTTP and send no token. Once the golden turns on TLS
 and auth (stormcos#143), they have to speak https with a token (#19).

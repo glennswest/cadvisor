@@ -4,6 +4,7 @@
 
 ### 2026-10-10
 - **fix:** cadvisor refuses to start when its cgroup root (`/sys/fs/cgroup`) is not a cgroup v2 mount (no `cgroup.controllers`), as upstream exits when its raw factory cannot register (#12). Before, it served a `/` with zero CPU and no subcontainers, which is what the first node run of `short` found on C2NR0Q2 (run 80a8f63e07). Test: `a_root_without_cgroup_controllers_is_refused`.
+- **docs:** README discovery note and #12 status, presentation issue table: the first node run's finding and stormcos#520 (bind the host's `/sys/fs/cgroup` into cadvisor's container).
 
 ### 2026-10-06
 - **feat:** must-gather collector `gather/cadvisor/status.sh` added to stormcos_qa (391cf16, #5). It covers cadvisor's API and self-metrics, stormd's view of the process and its log, and the node's cgroup and block trees. It was verified under sc-build against a live cadvisor-rs. README notes it.
