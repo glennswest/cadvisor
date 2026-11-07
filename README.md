@@ -332,14 +332,16 @@ On the build box, `cd test && CADVISOR_BIN=<path to cadvisor> cargo test`
 runs the unit tests. It also runs `tests/harness.rs`, which starts the real
 binary and runs `short` and `medium` against it, with the pod tests skipped.
 
-**Status (2026-10-10):** the suites are verified on the build box: unit
-tests, the harness, and the image built by `test/build.sh`. The first node run
-(`short`, stormcentral run `80a8f63e07` on C2NR0Q2) reached the Job and
-found a real problem. cadvisor's stormcos container has no cgroup2 tree:
-stormpump gives it a fresh sysfs, so `/sys/fs/cgroup` is empty. cadvisor saw
-only `/`, with zero CPU, and never saw the workload pod. The fix, a read-only
-bind of the host's `/sys/fs/cgroup`, is stormcos#520. #12 stays open until
-`short` and `medium` pass on a node.
+**Status (2026-11-07):** `short` and `medium` pass on nodes, pod tests
+included. `short` passed 10/10 at 1f5c50a on pvetest1 (stormcentral run
+`1b61043e4d`), C2NR0Q2 (`445f6b0db6`) and server7 (`1782a7b0ad`). `medium`
+passed 17/17 at 65c5309 on pvetest2 (`ddf1d9f080`) and server8 (`a17e84f7f5`).
+That run covered every endpoint and error contract, events, OOM (a 48 MiB
+limit → `oom` + `oomKill`), accuracy (0.396–0.500 cores against a 0.5 load,
+128 MiB) and 4–12 concurrent workload pods. The first node run found
+cadvisor's container had no cgroup2 tree. stormcos#520 fixed that by binding
+the host's `/sys/fs/cgroup` read-only. `long` (480 min budget) runs only on
+a pve VM in the night window: run `9bbdca4d90` is queued on pvetest2.
 
 The suites talk plain HTTP and send no token. Once the golden turns on TLS
 and auth (stormcos#143), they have to speak https with a token (#19).

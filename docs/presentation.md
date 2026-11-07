@@ -222,7 +222,7 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 
 | Issue | | |
 |---|---|---|
-| #12 | test container on a node | P1; first node run (2026-10-10) found cadvisor's container has no cgroup2 tree (stormcos#520); re-run after it ships |
+| #12 | test container on a node | short and medium pass on nodes (2026-11-07); long queued for the night window |
 | #3 | pod metadata | workload-record client done; live once stormcos#391 ships |
 | #15 | per-VM stats keyed to the VMI | P2; blocked on rustkube-node#84 (labels), stormvm#16 (network) |
 | #19 | test suites need https + a token | P2; after stormcos#143 turns TLS/auth on in the golden (#4, done) |

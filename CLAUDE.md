@@ -185,8 +185,14 @@ enrichment. Seven crates under `crates/` — see README.md.
   **2026-11-07: short passes on nodes** at 1f5c50a, 10/10 (pod tests
   included) on pvetest1 (1b61043e4d), C2NR0Q2 (445f6b0db6) and server7
   (1782a7b0ad); stormcos#520 shipped (golden-stormpump-4227eda0d330). Runs go
-  to a pve machine first now (stormcentral#791). Now: medium on pvetest1 at
-  49e5458, then long.
+  to a pve machine first now (stormcentral#791).
+  **medium passes**, 17/17 at 65c5309, on pvetest2 (ddf1d9f080) and server8
+  (a17e84f7f5): endpoints, error contract, events, OOM, accuracy,
+  many-containers, stormd steady. C2NR0Q2 was skipped (the pve run had not
+  finished yet). **long** (480 min budget) runs only on a pve VM in the night
+  window (22:00–07:00 America/Chicago). Run 9bbdca4d90 is queued on
+  pvetest2, and #12 is proposed `--night` to check it. Next: `stormcentral
+  test show 9bbdca4d90`; if it passes, close #12; if it fails, fix it.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4, closed) is in the code but off unless flags are set;
@@ -205,7 +211,7 @@ enrichment. Seven crates under `crates/` — see README.md.
   release tag.
 
 ### Open issues (validated 2026-09-28; priorities set in stormcentral)
-- #12 P1 test container: short passes on nodes (2026-11-07); medium, long next.
+- #12 P1 test container: short and medium pass on nodes; long run 9bbdca4d90 queued (night).
 - #3 P1 pod metadata: workload-record client done (2026-11-07); live check
   waits on stormcos#391.
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
