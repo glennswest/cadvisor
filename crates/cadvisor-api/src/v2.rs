@@ -233,11 +233,11 @@ fn derived_stats(handle: &ContainerHandle) -> v2::DerivedStats {
     let mut mem = Vec::new();
     for (i, s) in samples.iter().enumerate() {
         mem.push(s.memory.working_set);
-        if i > 0 {
-            if let Some(inst) = cadvisor_manager::derive::inst_cpu(&samples[i - 1], s) {
-                // milliCPU/s
-                cpu_rates.push(inst.usage.total / 1_000_000);
-            }
+        if i > 0
+            && let Some(inst) = cadvisor_manager::derive::inst_cpu(&samples[i - 1], s)
+        {
+            // milliCPU/s
+            cpu_rates.push(inst.usage.total / 1_000_000);
         }
     }
     let latest = samples.last();

@@ -71,7 +71,7 @@ pub fn fmt_float(v: f64, out: &mut String) {
     if neg {
         out.push('-');
     }
-    if exp < -4 || exp >= 6 {
+    if !(-4..6).contains(&exp) {
         // scientific: d.ddde±XX
         out.push_str(&digits[..1]);
         if digits.len() > 1 {
