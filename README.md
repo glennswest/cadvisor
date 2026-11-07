@@ -69,7 +69,7 @@ A slide deck on its purpose and functionality is in
   `/dev/<name>` on its next sample rather than `device=""` (#18). Devices
   `/sys/block` filters out (`loop*`, `ram*`, `sr*`, `fd*`) stay `device=""`,
   as upstream.
-- **TLS and bearer tokens (optional, #4).** Off by default, as upstream.
+- **TLS and bearer auth (optional, #4, #27).** Off by default, as upstream.
   See [TLS and auth](#tls-and-auth).
 - **Env metadata (#10).** With `-env_metadata_whitelist APP_,TZ`, each
   environment variable of a containerd container whose key starts with one of
@@ -88,8 +88,8 @@ A slide deck on its purpose and functionality is in
 
 All of these are served on one listener (`--listen-ip`:`--port`). It is plain
 HTTP, or HTTPS only when `--tls-cert-file` is set. With
-`--bearer-token-file`, every path except the three health paths needs a token
-([TLS and auth](#tls-and-auth)).
+`--auth-mode review` or `--bearer-token-file`, every path except the three
+health paths needs a token ([TLS and auth](#tls-and-auth)).
 
 | Path | What |
 |---|---|
@@ -148,6 +148,11 @@ mean `true`, as in Go.
 | `--tls-cert-file` | `""` (plain HTTP) | PEM certificate chain, leaf first. With it the port speaks HTTPS only. Needs `--tls-key-file`. Not in upstream. |
 | `--tls-key-file` | `""` | PEM private key for `--tls-cert-file` |
 | `--bearer-token-file` | `""` (no auth) | Accepted tokens, one per line, `#` comments. Not in upstream. |
+| `--auth-mode` | `""` | `review`: check a caller's bearer by TokenReview + SubjectAccessReview (`get nodes/metrics`). Tokens in `--bearer-token-file` are accepted too. Not in upstream. |
+| `--kube-apiserver` | `""` | The apiserver for the reviews, `https://host[:port]` |
+| `--kube-ca-file` | `""` | PEM CA for the apiserver's certificate; required with https |
+| `--kube-token-file` | `""` | cadvisor's own ServiceAccount token for the review calls |
+| `--kube-node-name` | `""` (the hostname) | The node named in the SubjectAccessReview |
 
 These metric group names change the output: `cpu`, `cpuLoad`
 (`container_cpu_load_*` and `container_tasks_state`), `memory`,
@@ -181,6 +186,23 @@ node API is TLS with a stormcert-issued certificate and authenticated
   compared in constant time. A file with no tokens is a startup error. A
   token file without TLS is allowed, with a warning, since the tokens then
   cross the network in clear.
+- **Reviews (`--auth-mode review`, #27)**: a caller sends its own
+  ServiceAccount token. cadvisor posts it to `--kube-apiserver` as a
+  `TokenReview`, then posts a `SubjectAccessReview` for the user it names
+  (with its uid, groups and extra): verb `get` (from the method, as the
+  kubelet maps it), resource `nodes`, subresource `metrics`, name
+  `--kube-node-name` (default: the hostname). That is the attribute
+  upstream's kubelet checks for `/metrics/cadvisor`, and it covers every
+  path, `/metrics` and the REST API alike. An unknown token gets `401`. A
+  valid one without the permission gets `403`. If the apiserver can't be
+  reached, or refuses cadvisor's own token, the caller gets `503` and the
+  reason is logged. The outcome is cached for 30 s per token and verb;
+  errors are not cached. cadvisor calls the reviews with
+  `--kube-token-file`, which needs `create` on `tokenreviews` and
+  `subjectaccessreviews` (as `system:auth-delegator` grants). The
+  apiserver's certificate is checked against `--kube-ca-file`, which is
+  required with https. Both files are re-read when replaced. A token in
+  `--bearer-token-file` passes without a review, which is useful for tests.
 - **The health paths stay anonymous**: stormd's liveness probe sends no token.
   It does speak https, and accepts any certificate.
 - **Rotation without a restart**: the certificate, key and token files are
@@ -195,12 +217,24 @@ node API is TLS with a stormcert-issued certificate and authenticated
 Tested end to end by `crates/cadvisor/tests/tls_auth.rs`. It starts the real
 binary with a generated certificate and checks: no plaintext answer, `401`
 without or with a wrong token, `200` with one, health without one, a rotated
-token file, and a key-then-certificate renewal.
+token file, and a key-then-certificate renewal. `crates/cadvisor/tests/review_auth.rs`
+runs the binary in review mode against a fake apiserver and checks: `401`,
+`403` and `200` on `/metrics` and the API; the file's token passing
+unreviewed; one review per token thanks to the cache; `503` when the
+apiserver is down; and refused startup flags. `review.rs`'s unit tests add
+the request bodies, cache expiry, and https checked against the CA, with a
+wrong CA refused.
 
-On stormcos these are not turned on yet. The golden needs a certificate
-minted for cadvisor, a token file for its scrapers, and an https liveness URL
-(stormcos#143, which also drops the anonymous `cadvisor.storm1.g8.lo` route
-meanwhile).
+On stormcos these are not turned on yet (stormcos#143). The golden needs:
+- a certificate minted for cadvisor;
+- cadvisor's own ServiceAccount token, with review rights;
+- the argv (`--auth-mode review --kube-apiserver … --kube-ca-file …
+  --kube-token-file …`);
+- an https liveness URL;
+- `get nodes/metrics` for its scrapers (ironprom, kube-apiserver).
+
+stormcos#143 also drops the anonymous `cadvisor.storm1.g8.lo` route
+meanwhile.
 
 ## Ports
 

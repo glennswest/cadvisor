@@ -37,6 +37,15 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-11-07 — #27 auth by TokenReview + SubjectAccessReview (owner's (A) on
+  stormcos#143): `crates/cadvisor/src/review.rs` + `secure::require_auth`.
+  `--auth-mode review`, `--kube-apiserver`, `--kube-ca-file`,
+  `--kube-token-file`, `--kube-node-name` (default hostname); SAR `get
+  nodes/<node>/metrics`; 401/403/503; 30 s cache; `--bearer-token-file`
+  still accepted. Verified: `sc-build` on b837b78 (sc-build-25f96a9016): 94
+  workspace tests incl. 6 `review::tests` and `tests/review_auth.rs` (real
+  binary vs a fake apiserver), clippy clean. Not on in the golden until
+  stormcos#143 sets the argv, SA token and RBAC.
 - 2026-11-07 — #3 stormpump pod identity: `cadvisor-runtime/src/workload.rs`
   reads the kubelet's `/run/rustkube/workloads/<basename>.json`
   (rustkube-node#84, shipped in golden 0fc1a74fff24) as the first link of the
@@ -122,17 +131,6 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- 2026-11-07 — #27 auth by TokenReview + SubjectAccessReview (owner's (A) on
-  stormcos#143). Plan: `crates/cadvisor/src/review.rs`, a hand-rolled hyper
-  http1 + rustls client to `--kube-apiserver` (`--kube-ca-file`,
-  `--kube-token-file` = cadvisor's own SA token, both re-read when
-  replaced). `--auth-mode review`: TokenReview the caller's bearer, then SAR
-  `get nodes/metrics` (name `--kube-node-name`, default the hostname), as the
-  kubelet authorises `/metrics/cadvisor`. 401 / 403 / 503 when the
-  apiserver can't be reached; outcomes cached 30 s, errors not.
-  `--bearer-token-file` stays as an extra accepted list; health paths stay
-  open. Tests: unit (fake apiserver, http and https with a CA) and the real
-  binary (`tests/review_auth.rs`).
 - 2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
   Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
   `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
@@ -206,8 +204,8 @@ enrichment. Seven crates under `crates/` — see README.md.
   test show 9bbdca4d90`; if it passes, close #12; if it fails, fix it.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
-- TLS / bearer auth (#4, closed) is in the code but off unless flags are set;
-  the stormcos golden does not set them yet (stormcos#143: cert, token, https
+- TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
+  unless flags are set; the stormcos golden does not set them yet (stormcos#143: cert, token, https
   liveness; the anonymous route is dropped meanwhile; stormlb#13).
 - #3 done in code; stormcos pods stay `id`-only on nodes until stormcos#391
   (host `/run` → `/hostrun` in cadvisor's container). (CRI-O's `ContainerReference.namespace = "crio"` is

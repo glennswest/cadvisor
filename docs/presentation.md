@@ -149,9 +149,11 @@ Glibc build. Not yet re-measured for the musl golden.
 
 **One HTTP listener**, `--listen-ip`:`--port`. Port **9096** on stormcos
 (9095 is stormvm), **8080** upstream/RPM default. Plain HTTP and no auth by
-default. Optional HTTPS (`--tls-cert-file`, `--tls-key-file`) and bearer tokens
-(`--bearer-token-file`), both re-read on rotation (#4). Health stays
-anonymous. Not yet on in the golden: stormcos#143.
+default. Optional HTTPS (`--tls-cert-file`, `--tls-key-file`), and bearer
+auth: a caller's own ServiceAccount token checked by TokenReview +
+SubjectAccessReview for `get nodes/metrics` (`--auth-mode review`, #27), or a
+static `--bearer-token-file` (#4). Files are re-read on rotation. Health
+stays anonymous. Not yet on in the golden: stormcos#143.
 
 | Path | |
 |---|---|
@@ -167,7 +169,8 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 `--store-container-labels true`, `--whitelisted-container-labels`,
 `--containerd /run/containerd/containerd.sock`, `--containerd-namespace k8s.io`,
 `--crio /var/run/crio/crio.sock`, `--tls-cert-file`, `--tls-key-file`,
-`--bearer-token-file`. Full table: README.
+`--bearer-token-file`, `--auth-mode review`, `--kube-apiserver`,
+`--kube-ca-file`, `--kube-token-file`, `--kube-node-name`. Full table: README.
 
 ---
 
@@ -193,8 +196,9 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 
 ## Planned — not in the code yet
 
-- **TLS and tokens on in the stormcos golden**: a stormcert certificate for
-  cadvisor, a token file, and https liveness (stormcos#143). The code is in (#4).
+- **TLS and reviews on in the stormcos golden**: a stormcert certificate for
+  cadvisor, its own SA token, the review argv and https liveness
+  (stormcos#143). The code is in (#4, #27).
 - **Pod metadata on stormcos** — read from the kubelet's workload records
   (#3, done); reaches nodes once stormcos#391 mounts the host's `/run`. Bare `pod`/`namespace` labels, beyond
   upstream, are an open decision (#16).
