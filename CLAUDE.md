@@ -37,6 +37,11 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-11-07 — #15 per-VM stats: identity comes from #3's reader (`kind: vm`
+  records; test `a_vm_record_names_its_vmi`, f7b3b08; sc-build
+  sc-build-cc5d357416: 95 tests, clippy clean). Disk via #18. Network needs
+  rustkube-node#88 / stormvm#16. Asked the owner (wait-owner) whether to
+  close: stormconsole graphs VMs from stormvm#48 now. Recommended: close.
 - 2026-11-07 — #27 auth by TokenReview + SubjectAccessReview (owner's (A) on
   stormcos#143): `crates/cadvisor/src/review.rs` + `secure::require_auth`.
   `--auth-mode review`, `--kube-apiserver`, `--kube-ca-file`,
@@ -222,8 +227,8 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #3 P1 pod metadata: workload-record client done (2026-11-07); live check
   waits on stormcos#391.
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
-- #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — blocked on
-  rustkube-node#84 (labels), stormvm#16 (network; SLIRP today).
+- #15 P2 per-VM stats: cadvisor side done; needs-owner (close, or keep for a
+  guest-matched proof). Network: rustkube-node#88 / stormvm#16.
 - #19 P2 test suites need https + token (proposed after stormcos#143).
 - #22 P3 v0.49.2 conformance diff not re-run since 2026-07-16 (nothing runs it).
 
