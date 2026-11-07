@@ -37,6 +37,12 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-11-07 — #29 `machine_nic_mtu_bytes` / `machine_nic_speed_mbps` per
+  machine-info NIC (labels device, mac + machine labels; beyond v0.49.2;
+  refresh with machine info). Verified: `sc-build` on 32b167d
+  (sc-build-7f164d2abd): 96 tests incl. `each_nic_gets_an_mtu_and_a_speed`,
+  clippy clean, and the real binary's /metrics showed eth0 MTU 1500 (= `ip
+  link`). Shipped with a /metrics proof; stormcos#637 adds METRICS.md.
 - 2026-11-07 — #15 per-VM stats: identity comes from #3's reader (`kind: vm`
   records; test `a_vm_record_names_its_vmi`, f7b3b08; sc-build
   sc-build-cc5d357416: 95 tests, clippy clean). Disk via #18. Network needs
