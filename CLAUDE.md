@@ -42,8 +42,12 @@ enrichment. Seven crates under `crates/` — see README.md.
   (rustkube-node#84, shipped in golden 0fc1a74fff24) as the first link of the
   factory chain; late records are re-checked (30s per tick, then per minute).
   Flag `-workload_identity_dir` (default `/run/…`, then `/hostrun/…`, so no
-  registry argv change is needed). Live on nodes only once stormcos#391
-  mounts the host's `/run` at `/hostrun` in cadvisor's container.
+  registry argv change is needed). Verified: `sc-build` on f3d7d6d (build VM
+  sc-build-f8281b81b4): 86 workspace + 22 `test/` tests pass, clippy
+  `--all-targets` clean in both (pre-existing lints fixed: #24, #31–#33).
+  Golden build ca3b53d1b1a6 requested. Live on nodes only once stormcos#391
+  mounts the host's `/run` at `/hostrun` in cadvisor's container; #3 is
+  proposed `--after stormcos#391` (commented there), not closed.
 - 2026-10-06 — #5 must-gather collector: `gather/cadvisor/status.sh` in
   stormcos_qa (391cf16; README row + CHANGELOG there). Verified with sc-build:
   built binary on :19396, collector fetched at 391cf16, `QA_SSH='sh -c'` →
