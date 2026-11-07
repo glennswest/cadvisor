@@ -46,14 +46,8 @@ pub struct CrioContainerInfo {
     pub image: String,
     #[serde(default, deserialize_with = "null_default")]
     pub labels: std::collections::BTreeMap<String, String>,
-    #[serde(default, deserialize_with = "null_default")]
-    pub annotations: std::collections::BTreeMap<String, String>,
     #[serde(default)]
     pub root: String,
-    #[serde(default, deserialize_with = "null_default")]
-    pub ip_address: String,
-    #[serde(default, deserialize_with = "null_default")]
-    pub ip_addresses: Vec<String>,
 }
 
 impl CrioClient {

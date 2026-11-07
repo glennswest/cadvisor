@@ -48,10 +48,10 @@ pub fn whitelisted_env(env: &[String], whitelist: &[String]) -> BTreeMap<String,
     let mut out = BTreeMap::new();
     for prefix in whitelist.iter().filter(|w| !w.is_empty()) {
         for var in env {
-            if let Some((k, v)) = var.split_once('=') {
-                if k.starts_with(prefix.as_str()) {
-                    out.insert(k.to_string(), v.to_string());
-                }
+            if let Some((k, v)) = var.split_once('=')
+                && k.starts_with(prefix.as_str())
+            {
+                out.insert(k.to_string(), v.to_string());
             }
         }
     }
