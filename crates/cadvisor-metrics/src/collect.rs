@@ -30,39 +30,6 @@ impl Default for MetricsOpts {
     }
 }
 
-/// Metric group token for each container family (upstream -disable_metrics
-/// vocabulary). Families of default-disabled groups are simply never emitted.
-fn family_group(name: &str) -> Option<&'static str> {
-    if name.starts_with("container_cpu_load") || name == "container_tasks_state" {
-        return Some("cpuLoad");
-    }
-    if name.starts_with("container_cpu") {
-        return Some("cpu");
-    }
-    if name.starts_with("container_memory") {
-        return Some("memory");
-    }
-    if matches!(
-        name,
-        "container_fs_inodes_free"
-            | "container_fs_inodes_total"
-            | "container_fs_limit_bytes"
-            | "container_fs_usage_bytes"
-    ) {
-        return Some("disk");
-    }
-    if name.starts_with("container_fs") || name.starts_with("container_blkio") {
-        return Some("diskIO");
-    }
-    if name.starts_with("container_network") {
-        return Some("network");
-    }
-    if name == "container_oom_events_total" {
-        return Some("oom_event");
-    }
-    None
-}
-
 fn sanitize_label_name(name: &str) -> String {
     name.chars()
         .map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' })

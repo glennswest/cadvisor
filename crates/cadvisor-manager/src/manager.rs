@@ -569,30 +569,30 @@ impl Manager {
                         cadvisor_host::fs::dir_usage(std::path::Path::new(diff_dir));
                     *handle.fs_usage.write().unwrap() = usage;
                 }
-                if handle.name() != "/" {
-                    if let Ok(cg) = self.reader.read_spec(handle.name()) {
-                        let mut spec = handle.spec.write().unwrap();
-                        spec.has_memory = cg.has_memory;
-                        spec.memory.limit = cg.memory_limit;
-                        spec.memory.swap_limit = cg.swap_limit;
-                        spec.memory.reservation = cg.memory_reservation;
-                        spec.cpu.limit = cg.cpu_shares;
-                        spec.cpu.mask = cg.cpu_mask;
-                        spec.cpu.period = cg.cpu_period;
-                        spec.cpu.quota = cg.cpu_quota.unwrap_or(0);
-                        spec.processes.limit = cg.pids_limit;
-                    }
+                if handle.name() != "/"
+                    && let Ok(cg) = self.reader.read_spec(handle.name())
+                {
+                    let mut spec = handle.spec.write().unwrap();
+                    spec.has_memory = cg.has_memory;
+                    spec.memory.limit = cg.memory_limit;
+                    spec.memory.swap_limit = cg.swap_limit;
+                    spec.memory.reservation = cg.memory_reservation;
+                    spec.cpu.limit = cg.cpu_shares;
+                    spec.cpu.mask = cg.cpu_mask;
+                    spec.cpu.period = cg.cpu_period;
+                    spec.cpu.quota = cg.cpu_quota.unwrap_or(0);
+                    spec.processes.limit = cg.pids_limit;
                 }
             }
             match self.sample(&handle) {
                 Ok(sample) => {
                     let sample = Arc::new(sample);
                     // OOM kill counter went up -> emit oom + oomKill events.
-                    if let Some(p) = &prev {
-                        if sample.oom_events > p.oom_events {
-                            self.record_event(handle.name(), v1::EventType::Oom, GoTime::now());
-                            self.record_event(handle.name(), v1::EventType::OomKill, GoTime::now());
-                        }
+                    if let Some(p) = &prev
+                        && sample.oom_events > p.oom_events
+                    {
+                        self.record_event(handle.name(), v1::EventType::Oom, GoTime::now());
+                        self.record_event(handle.name(), v1::EventType::OomKill, GoTime::now());
                     }
                     if self.cfg.allow_dynamic_housekeeping {
                         let unchanged = prev.as_ref().is_some_and(|p| {
@@ -625,38 +625,38 @@ impl Manager {
         let name = handle.name();
         let mut stats = self.reader.read_stats(name, GoTime::now())?;
         self.note_disks(&stats.disk_io.io_service_bytes);
-        if handle.reports_network.load(std::sync::atomic::Ordering::Relaxed) {
-            if let Some(pid) = *handle.init_pid.read().unwrap() {
-                if let Ok(content) = std::fs::read_to_string(format!("/proc/{pid}/net/dev")) {
-                    let interfaces = parse::parse_proc_net_dev(&content);
-                    if let Some(first) = interfaces.first() {
-                        stats.network.interface = first.clone();
-                    }
-                    stats.network.interfaces = interfaces;
-                }
+        let pid = *handle.init_pid.read().unwrap();
+        if handle.reports_network.load(std::sync::atomic::Ordering::Relaxed)
+            && let Some(pid) = pid
+            && let Ok(content) = std::fs::read_to_string(format!("/proc/{pid}/net/dev"))
+        {
+            let interfaces = parse::parse_proc_net_dev(&content);
+            if let Some(first) = interfaces.first() {
+                stats.network.interface = first.clone();
             }
+            stats.network.interfaces = interfaces;
         }
         if name == "/" {
             self.fill_root_stats(&mut stats)?;
         } else if let Some(diff_dir) = &handle.rootfs_diff {
             // Runtime container writable layer: partition capacity/inodes
             // from statfs, usage from the cached directory walk.
-            if let Some(p) = self.fs.partition_for_path(diff_dir) {
-                if let Ok(u) = self.fs.usage(&p.mountpoint) {
-                    let (du_bytes, _) = *handle.fs_usage.read().unwrap();
-                    stats.filesystem.push(v1::FsStats {
-                        device: p.device.clone(),
-                        fs_type: "vfs".to_string(),
-                        limit: u.capacity,
-                        usage: du_bytes,
-                        base_usage: du_bytes,
-                        available: u.available,
-                        has_inodes: true,
-                        inodes: u.inodes,
-                        inodes_free: u.inodes_free,
-                        ..Default::default()
-                    });
-                }
+            if let Some(p) = self.fs.partition_for_path(diff_dir)
+                && let Ok(u) = self.fs.usage(&p.mountpoint)
+            {
+                let (du_bytes, _) = *handle.fs_usage.read().unwrap();
+                stats.filesystem.push(v1::FsStats {
+                    device: p.device.clone(),
+                    fs_type: "vfs".to_string(),
+                    limit: u.capacity,
+                    usage: du_bytes,
+                    base_usage: du_bytes,
+                    available: u.available,
+                    has_inodes: true,
+                    inodes: u.inodes,
+                    inodes_free: u.inodes_free,
+                    ..Default::default()
+                });
             }
         }
         Ok(stats)
