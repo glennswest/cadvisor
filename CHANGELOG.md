@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### 2026-11-07
+- **feat:** stormpump pods get identity (#3). New metadata source beside containerd and CRI-O: the kubelet's workload records, `/run/rustkube/workloads/<cgroup basename>.json` (rustkube-node#84). A cgroup whose record names it gets `image`, the CRI labels (`io.kubernetes.pod.{name,namespace,uid}`, `io.kubernetes.container.name`, so `container_label_*` and rustkube's `metrics.k8s.io`), the container id as alias, namespace tag `stormpump`, the init pid, and network stats for the pod sandbox (`reports_network`). A cgroup seen before its record is re-checked every housekeeping tick for 30s, then once a minute. New flag `-workload_identity_dir` (default: `/run/rustkube/workloads`, then `/hostrun/rustkube/workloads` for the stormcos container once stormcos#391 mounts the host's `/run`). Tests: record → metadata, sandbox network, cgroup must match, missing directory.
+- **docs:** README runtime metadata and flag table, presentation, CLAUDE.md work plan.
+
 ### 2026-10-10
 - **fix:** cadvisor refuses to start when its cgroup root (`/sys/fs/cgroup`) is not a cgroup v2 mount (no `cgroup.controllers`), as upstream exits when its raw factory cannot register (#12). Before, it served a `/` with zero CPU and no subcontainers, which is what the first node run of `short` found on C2NR0Q2 (run 80a8f63e07). Test: `a_root_without_cgroup_controllers_is_refused`.
 - **docs:** README discovery note and #12 status, presentation issue table: the first node run's finding and stormcos#520 (bind the host's `/sys/fs/cgroup` into cadvisor's container).

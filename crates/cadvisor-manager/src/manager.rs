@@ -36,6 +36,10 @@ pub fn check_cgroup2(root: &str) -> Result<(), ManagerError> {
     }
 }
 
+/// How long after discovery a cgroup without identity is re-checked for a
+/// workload record on every housekeeping tick.
+const IDENTITY_GRACE: Duration = Duration::from_secs(30);
+
 #[derive(Debug, Clone)]
 pub struct ManagerConfig {
     pub cgroup_root: String,
@@ -54,6 +58,9 @@ pub struct ManagerConfig {
     /// Env var key prefixes exported as `spec.envs` (upstream
     /// `-env_metadata_whitelist`); empty = none.
     pub env_metadata_whitelist: Vec<String>,
+    /// Directory of stormpump workload identity records (rustkube-node#84);
+    /// empty = `/run/rustkube/workloads`, then `/hostrun/rustkube/workloads`.
+    pub workload_identity_dir: String,
 }
 
 impl Default for ManagerConfig {
@@ -71,6 +78,7 @@ impl Default for ManagerConfig {
             containerd_namespace: "k8s.io".to_string(),
             crio_socket: "/var/run/crio/crio.sock".to_string(),
             env_metadata_whitelist: Vec::new(),
+            workload_identity_dir: String::new(),
         }
     }
 }
@@ -112,6 +120,7 @@ pub struct Manager {
     event_tx: tokio::sync::broadcast::Sender<Arc<v1::Event>>,
     containerd: tokio::sync::OnceCell<Option<cadvisor_runtime::ContainerdClient>>,
     crio: cadvisor_runtime::CrioClient,
+    workloads: cadvisor_runtime::WorkloadRecords,
 }
 
 /// Filter for the v1.3 events endpoint.
@@ -186,6 +195,7 @@ impl Manager {
             cadvisor_revision: String::new(),
         };
         let crio = cadvisor_runtime::CrioClient::new(&cfg.crio_socket);
+        let workloads = cadvisor_runtime::WorkloadRecords::new(&cfg.workload_identity_dir);
         Ok(Manager {
             cfg,
             reader,
@@ -198,6 +208,7 @@ impl Manager {
             event_tx: tokio::sync::broadcast::channel(1024).0,
             containerd: tokio::sync::OnceCell::new(),
             crio,
+            workloads,
         })
     }
 
@@ -311,6 +322,47 @@ impl Manager {
             }
         }
         None
+    }
+
+    /// Identity for a stormpump workload cgroup from the kubelet's record.
+    fn workload_meta(&self, name: &str) -> Option<cadvisor_runtime::ContainerMeta> {
+        if name == "/" {
+            return None;
+        }
+        self.workloads.lookup(name).map(cadvisor_runtime::WorkloadRecord::into_meta)
+    }
+
+    /// Fills a handle's reference and spec from runtime metadata.
+    fn apply_meta(&self, handle: &ContainerHandle, meta: cadvisor_runtime::ContainerMeta) {
+        {
+            let mut reference = handle.reference.write().unwrap();
+            reference.id = meta.id;
+            reference.aliases = meta.aliases;
+            reference.namespace = meta.namespace;
+        }
+        {
+            let mut spec = handle.spec.write().unwrap();
+            spec.image = meta.image;
+            spec.labels = meta.labels;
+            spec.envs = cadvisor_runtime::whitelisted_env(&meta.env, &self.cfg.env_metadata_whitelist);
+            spec.has_network = meta.reports_network;
+        }
+        *handle.init_pid.write().unwrap() = meta.init_pid;
+        handle.reports_network.store(meta.reports_network, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// A cgroup found before its workload record was written (the kubelet
+    /// writes it as the container starts) is labelled once the record shows
+    /// up: looked for on every housekeeping tick for the first
+    /// [`IDENTITY_GRACE`], then once a minute.
+    fn retry_workload_identity(&self, handle: &ContainerHandle) {
+        if !handle.reference.read().unwrap().namespace.is_empty() || !self.workloads.available() {
+            return;
+        }
+        if let Some(meta) = self.workload_meta(handle.name()) {
+            tracing::debug!(container = handle.name(), "workload identity found");
+            self.apply_meta(handle, meta);
+        }
     }
 
     /// Starts discovery and housekeeping. Call once, from the runtime.
@@ -438,37 +490,29 @@ impl Manager {
             }
         };
 
-        // Factory chain: runtime enrichment for 64-hex container cgroups,
-        // raw fallback otherwise.
-        let mut reference = v1::ContainerReference { name: name.to_string(), ..Default::default() };
-        let mut init_pid = if name == "/" { Some(1) } else { None };
-        let mut reports_network = name == "/";
-        let mut rootfs_diff = None;
-        if let Some(meta) = self.runtime_meta(basename).await {
-            reference.id = meta.id;
-            reference.aliases = meta.aliases;
-            reference.namespace = meta.namespace;
-            spec.image = meta.image;
-            spec.labels = meta.labels;
-            spec.envs = cadvisor_runtime::whitelisted_env(&meta.env, &self.cfg.env_metadata_whitelist);
-            spec.has_network = meta.reports_network;
-            spec.has_filesystem = meta.rootfs_diff.is_some();
-            init_pid = meta.init_pid;
-            reports_network = meta.reports_network;
-            rootfs_diff = meta.rootfs_diff;
-        }
-
+        // Factory chain: a stormpump workload record (rustkube-node#84),
+        // then runtime enrichment for 64-hex container cgroups, raw fallback
+        // otherwise.
+        let meta = match self.workload_meta(name) {
+            Some(meta) => Some(meta),
+            None => self.runtime_meta(basename).await,
+        };
+        let rootfs_diff = meta.as_ref().and_then(|m| m.rootfs_diff.clone());
+        spec.has_filesystem = rootfs_diff.is_some();
         let handle = Arc::new(ContainerHandle {
             name: name.to_string(),
-            reference: RwLock::new(reference),
+            reference: RwLock::new(v1::ContainerReference { name: name.to_string(), ..Default::default() }),
             spec: RwLock::new(spec),
             store: Mutex::new(TimedStore::new(self.cfg.storage_duration)),
-            init_pid: RwLock::new(init_pid),
-            reports_network: std::sync::atomic::AtomicBool::new(reports_network),
+            init_pid: RwLock::new(if name == "/" { Some(1) } else { None }),
+            reports_network: std::sync::atomic::AtomicBool::new(name == "/"),
             rootfs_diff,
             fs_usage: RwLock::new((0, 0)),
             task: Mutex::new(None),
         });
+        if let Some(meta) = meta {
+            self.apply_meta(&handle, meta);
+        }
         {
             let mut map = self.containers.write().unwrap();
             if map.contains_key(name) {
@@ -507,12 +551,17 @@ impl Manager {
         let mut prev: Option<Arc<v1::ContainerStats>> = None;
         let mut last_slow = std::time::Instant::now() - Duration::from_secs(3600);
         let mut first_iteration = true;
+        let added = std::time::Instant::now();
         loop {
+            let slow_due = last_slow.elapsed() >= Duration::from_secs(60) || first_iteration;
+            if handle.name() != "/" && (slow_due || added.elapsed() < IDENTITY_GRACE) {
+                self.retry_workload_identity(&handle);
+            }
             // Slow path (once a minute, plus once shortly after creation):
             // refresh writable-layer usage (upstream fsHandler cadence) and
             // re-read the cgroup spec — controller files appear a beat after
             // the cgroup itself when systemd updates subtree_control.
-            if last_slow.elapsed() >= Duration::from_secs(60) || first_iteration {
+            if slow_due {
                 first_iteration = false;
                 last_slow = std::time::Instant::now();
                 if let Some(diff_dir) = &handle.rootfs_diff {

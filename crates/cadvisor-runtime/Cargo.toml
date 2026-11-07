@@ -1,6 +1,6 @@
 [package]
 name = "cadvisor-runtime"
-description = "Container runtime metadata clients (containerd gRPC, CRI-O unix-socket HTTP) for cadvisor-rs"
+description = "Container runtime metadata clients (containerd gRPC, CRI-O unix-socket HTTP, stormpump workload records) for cadvisor-rs"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

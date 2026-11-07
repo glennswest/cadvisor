@@ -37,6 +37,13 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-11-07 — #3 stormpump pod identity: `cadvisor-runtime/src/workload.rs`
+  reads the kubelet's `/run/rustkube/workloads/<basename>.json`
+  (rustkube-node#84, shipped in golden 0fc1a74fff24) as the first link of the
+  factory chain; late records are re-checked (30s per tick, then per minute).
+  Flag `-workload_identity_dir` (default `/run/…`, then `/hostrun/…`, so no
+  registry argv change is needed). Live on nodes only once stormcos#391
+  mounts the host's `/run` at `/hostrun` in cadvisor's container.
 - 2026-10-06 — #5 must-gather collector: `gather/cadvisor/status.sh` in
   stormcos_qa (391cf16; README row + CHANGELOG there). Verified with sc-build:
   built binary on :19396, collector fetched at 391cf16, `QA_SSH='sh -c'` →
@@ -176,8 +183,8 @@ enrichment. Seven crates under `crates/` — see README.md.
 - TLS / bearer auth (#4, closed) is in the code but off unless flags are set;
   the stormcos golden does not set them yet (stormcos#143: cert, token, https
   liveness; the anonymous route is dropped meanwhile; stormlb#13).
-- #3 stormcos pods (stormpump, cgroups `/stormpump/w<tag>-<n>`) get no
-  metadata, only `id`. (CRI-O's `ContainerReference.namespace = "crio"` is
+- #3 done in code; stormcos pods stay `id`-only on nodes until stormcos#391
+  (host `/run` → `/hostrun` in cadvisor's container). (CRI-O's `ContainerReference.namespace = "crio"` is
   upstream's own value, not a gap.)
 - #12 the test suites have not run on a node yet (C2NR0Q2 down; see above).
   Latest (2026-09-28): C2NR0Q2's :5100 answers again; the furthest run
@@ -190,8 +197,8 @@ enrichment. Seven crates under `crates/` — see README.md.
 
 ### Open issues (validated 2026-09-28; priorities set in stormcentral)
 - #12 P1 test container: built and verified on dev; node run blocked.
-- #3 P1 pod metadata (see above); blocked on rustkube-node#84 (the identity
-  source for stormpump pods; open, not started as of 2026-10-06).
+- #3 P1 pod metadata: workload-record client done (2026-11-07); live check
+  waits on stormcos#391.
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
 - #15 P2 per-VM stats keyed to the VMI (from stormconsole#14) — blocked on
   rustkube-node#84 (labels), stormvm#16 (network; SLIRP today).

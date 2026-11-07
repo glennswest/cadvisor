@@ -42,11 +42,22 @@ A slide deck on its purpose and functionality is in
   missing, those containers are monitored as raw cgroups. Only the pod sandbox
   container reports network stats, which it reads from its init PID's
   `/proc/<pid>/net`.
-- **stormcos pods have no metadata.** On stormcos, pods run under stormpump,
-  not containerd or CRI-O. cadvisor has no client for stormpump, and stormpump
-  names their cgroups opaquely (`/stormpump/w<tag>-<n>`). So those containers
-  are raw cgroups with only the `id` label: no `name`, `image` or
-  `container_label_*` (#3).
+- **stormcos pods: the kubelet's workload records** (#3). On stormcos, pods
+  run under stormpump, not containerd or CRI-O, in opaque cgroups
+  (`/stormpump/w<tag>-<n>`). rustkube's kubelet writes one JSON record per
+  workload in the node's `/run/rustkube/workloads/<cgroup basename>.json`
+  (rustkube-node#84; format in rustkube-node `docs/metrics.md`). cadvisor
+  reads it for every new cgroup whose record's `cgroup` field is that cgroup:
+  `image`, the CRI labels with `io.kubernetes.pod.{name,namespace,uid}` and
+  `io.kubernetes.container.name` (so `container_label_*`, and what rustkube's
+  `metrics.k8s.io` reads), the id as alias, the init pid, and
+  `reports_network` for the pod sandbox. The namespace tag is `stormpump`. A
+  cgroup that appears before its record is re-checked on every housekeeping
+  tick for 30s, then once a minute. The directory is
+  `-workload_identity_dir`, by default `/run/rustkube/workloads` and then
+  `/hostrun/rustkube/workloads` (cadvisor's stormcos container, once
+  stormcos#391 mounts the host's `/run` there). Until then stormcos pods stay
+  raw cgroups with only `id`.
 - **Events.** It records container creation and deletion. It also records
   `oom` + `oomKill` events whenever `memory.events` `oom_kill` goes up. Events
   are served on `/api/v1.3/events` and `/api/v2.x/events`.
@@ -67,8 +78,7 @@ A slide deck on its purpose and functionality is in
   `-store_container_labels` is true, as upstream. The environment is read from
   containerd's OCI spec (`process.env`). CRI-O containers get none, because
   CRI-O's inspect API has no environment; upstream collects it only for
-  containerd and docker too. stormpump pods have no runtime metadata at all
-  (#3).
+  containerd and docker too. stormpump records carry no environment.
 - **Not implemented:** protobuf responses, and upstream's
   default-disabled metric groups (tcp/udp/advtcp, sched, hugetlb, perf,
   resctrl, …). The names of those groups are accepted in the flags and emit
@@ -134,6 +144,7 @@ mean `true`, as in Go.
 | `-containerd` | `/run/containerd/containerd.sock` | containerd socket |
 | `-containerd-namespace` | `k8s.io` | containerd namespace |
 | `-crio` | `/var/run/crio/crio.sock` | CRI-O socket |
+| `-workload_identity_dir` | `""` (`/run/rustkube/workloads`, then `/hostrun/rustkube/workloads`) | stormpump workload identity records (rustkube-node#84). Not in upstream. |
 | `--tls-cert-file` | `""` (plain HTTP) | PEM certificate chain, leaf first. With it the port speaks HTTPS only. Needs `--tls-key-file`. Not in upstream. |
 | `--tls-key-file` | `""` | PEM private key for `--tls-cert-file` |
 | `--bearer-token-file` | `""` (no auth) | Accepted tokens, one per line, `#` comments. Not in upstream. |

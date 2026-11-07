@@ -3,8 +3,10 @@
 //! - containerd: gRPC over its unix socket (`containers.v1` for metadata,
 //!   `tasks.v1` for the init PID), default namespace `k8s.io`.
 //! - CRI-O: HTTP/1 over its unix socket (`GET /info`, `GET /containers/<id>`).
+//! - stormpump (stormcos): the kubelet's per-workload identity records in
+//!   `/run/rustkube/workloads/<cgroup basename>.json` ([`workload`]).
 //!
-//! Both return a runtime-agnostic [`ContainerMeta`] the manager's factory
+//! All return a runtime-agnostic [`ContainerMeta`] the manager's factory
 //! chain uses to enrich raw cgroups. Missing sockets degrade gracefully.
 
 use std::collections::BTreeMap;
@@ -23,7 +25,7 @@ pub enum RuntimeError {
 #[derive(Debug, Clone, Default)]
 pub struct ContainerMeta {
     pub id: String,
-    /// Runtime namespace tag ("containerd" or "crio").
+    /// Runtime namespace tag ("containerd", "crio" or "stormpump").
     pub namespace: String,
     pub aliases: Vec<String>,
     pub image: String,
@@ -70,6 +72,9 @@ pub fn oci_spec_env(spec_json: &[u8]) -> Vec<String> {
     }
     serde_json::from_slice::<Spec>(spec_json).map(|s| s.process.env).unwrap_or_default()
 }
+
+pub mod workload;
+pub use workload::{WorkloadRecord, WorkloadRecords};
 
 #[cfg(target_os = "linux")]
 mod containerd;

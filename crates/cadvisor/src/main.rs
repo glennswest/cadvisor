@@ -84,6 +84,12 @@ pub struct Args {
     #[arg(long, default_value = "/var/run/crio/crio.sock")]
     pub crio: String,
 
+    /// Directory of stormpump workload identity records written by
+    /// rustkube's kubelet (`<cgroup basename>.json`). Empty =
+    /// /run/rustkube/workloads, then /hostrun/rustkube/workloads
+    #[arg(long = "workload_identity_dir", alias = "workload-identity-dir", default_value = "")]
+    pub workload_identity_dir: String,
+
     /// PEM certificate chain (leaf first) to serve HTTPS with; needs
     /// --tls-key-file. Re-read when the file is replaced. Empty = plain HTTP
     #[arg(long = "tls-cert-file", alias = "tls_cert_file", default_value = "")]
@@ -159,6 +165,7 @@ fn main() -> anyhow::Result<()> {
         containerd_socket: args.containerd.clone(),
         containerd_namespace: args.containerd_namespace.clone(),
         crio_socket: args.crio.clone(),
+        workload_identity_dir: args.workload_identity_dir.clone(),
         env_metadata_whitelist: args
             .env_metadata_whitelist
             .split(',')

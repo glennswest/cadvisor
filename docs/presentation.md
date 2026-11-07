@@ -100,8 +100,9 @@ Seven crates: `cadvisor` (binary), `-model` (wire types), `-host`, `-runtime`,
 - **Runtime metadata**: containerd `containers.v1` / `tasks.v1` in namespace
   `k8s.io`; CRI-O `GET /info`, `GET /containers/<id>`. A missing socket means
   raw cgroups, not an error. Network stats come from the pod sandbox's
-  `/proc/<pid>/net`. stormcos pods run under stormpump, which has no
-  metadata client: their cgroups (`/stormpump/w<tag>-<n>`) carry only `id` (#3).
+  `/proc/<pid>/net`. stormcos pods run under stormpump: their cgroups
+  (`/stormpump/w<tag>-<n>`) are labelled from the kubelet's records in
+  `/run/rustkube/workloads/` (#3, rustkube-node#84; needs stormcos#391).
 
 ---
 
@@ -194,8 +195,8 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 
 - **TLS and tokens on in the stormcos golden**: a stormcert certificate for
   cadvisor, a token file, and https liveness (stormcos#143). The code is in (#4).
-- **Pod metadata on stormcos** — stormpump pods carry only `id` (#3); the
-  identity source is rustkube-node#84. Bare `pod`/`namespace` labels, beyond
+- **Pod metadata on stormcos** — read from the kubelet's workload records
+  (#3, done); reaches nodes once stormcos#391 mounts the host's `/run`. Bare `pod`/`namespace` labels, beyond
   upstream, are an open decision (#16).
 - **A must-gather collector** in stormcos_qa (#5).
 - **Test suites over https with a token**, for when stormcos#143 lands (#19).
@@ -222,7 +223,7 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 | Issue | | |
 |---|---|---|
 | #12 | test container on a node | P1; first node run (2026-10-10) found cadvisor's container has no cgroup2 tree (stormcos#520); re-run after it ships |
-| #3 | pod metadata | P1; no labels for stormpump pods (waits on rustkube-node#84) |
+| #3 | pod metadata | workload-record client done; live once stormcos#391 ships |
 | #15 | per-VM stats keyed to the VMI | P2; blocked on rustkube-node#84 (labels), stormvm#16 (network) |
 | #19 | test suites need https + a token | P2; after stormcos#143 turns TLS/auth on in the golden (#4, done) |
 | #16 | decide: bare `pod`/`namespace` labels | P3; owner's call |
