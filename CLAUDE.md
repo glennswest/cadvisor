@@ -182,6 +182,11 @@ enrichment. Seven crates under `crates/` — see README.md.
   c2e3c26 until stormcos#520 ships** (said so on #520), or cadvisor would
   stay down on nodes. #12 proposed `--after stormcos#520`; then re-run
   short, then medium.
+  **2026-11-07: short passes on nodes** at 1f5c50a, 10/10 (pod tests
+  included) on pvetest1 (1b61043e4d), C2NR0Q2 (445f6b0db6) and server7
+  (1782a7b0ad); stormcos#520 shipped (golden-stormpump-4227eda0d330). Runs go
+  to a pve machine first now (stormcentral#791). Now: medium on pvetest1 at
+  49e5458, then long.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4, closed) is in the code but off unless flags are set;
@@ -200,7 +205,7 @@ enrichment. Seven crates under `crates/` — see README.md.
   release tag.
 
 ### Open issues (validated 2026-09-28; priorities set in stormcentral)
-- #12 P1 test container: built and verified on dev; node run blocked.
+- #12 P1 test container: short passes on nodes (2026-11-07); medium, long next.
 - #3 P1 pod metadata: workload-record client done (2026-11-07); live check
   waits on stormcos#391.
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
