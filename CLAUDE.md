@@ -122,6 +122,17 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
+- 2026-11-07 — #27 auth by TokenReview + SubjectAccessReview (owner's (A) on
+  stormcos#143). Plan: `crates/cadvisor/src/review.rs`, a hand-rolled hyper
+  http1 + rustls client to `--kube-apiserver` (`--kube-ca-file`,
+  `--kube-token-file` = cadvisor's own SA token, both re-read when
+  replaced). `--auth-mode review`: TokenReview the caller's bearer, then SAR
+  `get nodes/metrics` (name `--kube-node-name`, default the hostname), as the
+  kubelet authorises `/metrics/cadvisor`. 401 / 403 / 503 when the
+  apiserver can't be reached; outcomes cached 30 s, errors not.
+  `--bearer-token-file` stays as an extra accepted list; health paths stay
+  open. Tests: unit (fake apiserver, http and https with a CA) and the real
+  binary (`tests/review_auth.rs`).
 - 2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
   Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
   `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
