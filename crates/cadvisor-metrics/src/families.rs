@@ -73,6 +73,9 @@ pub const FAMILIES: &[(&str, Kind, &str)] = &[
     ("machine_cpu_physical_cores", Kind::Gauge, "Number of physical CPU cores."),
     ("machine_cpu_sockets", Kind::Gauge, "Number of CPU sockets."),
     ("machine_memory_bytes", Kind::Gauge, "Amount of memory installed on the machine."),
+    // Not in v0.49.2 (#29, stormcos#637): machine info's network_devices.
+    ("machine_nic_mtu_bytes", Kind::Gauge, "MTU of the network device, from machine info."),
+    ("machine_nic_speed_mbps", Kind::Gauge, "Link speed of the network device in Mbit/s, from machine info (0 or -1 when unknown)."),
     ("machine_nvm_avg_power_budget_watts", Kind::Gauge, "NVM power budget."),
     ("machine_nvm_capacity", Kind::Gauge, "NVM capacity value labeled by NVM mode (memory mode or app direct mode)."),
     ("machine_scrape_error", Kind::Gauge, "1 if there was an error while getting machine metrics, 0 otherwise."),

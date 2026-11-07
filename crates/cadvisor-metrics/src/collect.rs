@@ -477,9 +477,24 @@ pub fn render(manager: &Manager, opts: &MetricsOpts, buf: &mut String) {
         mi.nvm_info.avg_power_budget as f64,
         mts,
     );
+    nic_metrics(&mut out, &mi, mlabels(), mts);
     out.push("machine_scrape_error", vec![], 0.0, None);
 
     out.render(buf);
+}
+
+/// One MTU and one speed gauge per device in machine info's
+/// `network_devices` (beyond v0.49.2; #29, stormcos#637). Same devices and
+/// refresh as machine info: re-read every `-update_machine_info_interval`.
+fn nic_metrics(out: &mut Output, mi: &v1::MachineInfo, machine: Vec<(String, String)>, mts: Option<i64>) {
+    for nic in &mi.network_devices {
+        let mut l = machine.clone();
+        l.push(("device".to_string(), nic.name.clone()));
+        l.push(("mac".to_string(), nic.mac_address.clone()));
+        l.sort_by(|a, b| a.0.cmp(&b.0));
+        out.push("machine_nic_mtu_bytes", l.clone(), nic.mtu as f64, mts);
+        out.push("machine_nic_speed_mbps", l, nic.speed as f64, mts);
+    }
 }
 
 pub fn router(manager: Arc<Manager>, opts: MetricsOpts) -> axum::Router {
@@ -525,6 +540,31 @@ mod tests {
         let own = ContainerLabels::own_from("/c", &spec, &reference, &opts);
         assert!(!own.contains_key("container_env_APP_MODE"));
         assert_eq!(own.get("container_label_app").map(String::as_str), Some("web"));
+    }
+
+    #[test]
+    fn each_nic_gets_an_mtu_and_a_speed() {
+        let mi = v1::MachineInfo {
+            network_devices: vec![
+                v1::NetInfo { name: "enp1s0f0".into(), mac_address: "aa:bb:cc:00:00:01".into(), speed: 10000, mtu: 9000 },
+                v1::NetInfo { name: "br0".into(), mac_address: "aa:bb:cc:00:00:02".into(), speed: -1, mtu: 1500 },
+            ],
+            ..Default::default()
+        };
+        let mut out = Output::default();
+        nic_metrics(&mut out, &mi, vec![("machine_id".to_string(), "m1".to_string())], None);
+        let mut buf = String::new();
+        out.render(&mut buf);
+        for line in [
+            r#"machine_nic_mtu_bytes{device="enp1s0f0",mac="aa:bb:cc:00:00:01",machine_id="m1"} 9000"#,
+            r#"machine_nic_speed_mbps{device="enp1s0f0",mac="aa:bb:cc:00:00:01",machine_id="m1"} 10000"#,
+            r#"machine_nic_mtu_bytes{device="br0",mac="aa:bb:cc:00:00:02",machine_id="m1"} 1500"#,
+            r#"machine_nic_speed_mbps{device="br0",mac="aa:bb:cc:00:00:02",machine_id="m1"} -1"#,
+            "# TYPE machine_nic_mtu_bytes gauge",
+            "# TYPE machine_nic_speed_mbps gauge",
+        ] {
+            assert!(buf.lines().any(|l| l == line), "missing {line:?} in\n{buf}");
+        }
     }
 
     #[test]

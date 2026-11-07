@@ -174,6 +174,20 @@ families follow their group. `cadvisor_version_info`, `container_start_time_seco
 `--enable-metrics` is set, every group in that list that you do not name is
 disabled.
 
+Two machine families are not in v0.49.2 (#29, stormcos#637). Each has one
+series per device in machine info's `network_devices`: every interface except
+`lo`, `veth*` and `docker*`, as upstream lists them, so bridges are included.
+- `machine_nic_mtu_bytes{device, mac, …}`: the MTU, so a node's jumbo frames
+  show in its metrics.
+- `machine_nic_speed_mbps{device, mac, …}`: the link speed, from
+  `/sys/class/net/<dev>/speed`. It is `-1` when the driver reports none, and
+  `0` when the file can't be read (a virtual device).
+
+Both carry the usual `boot_id`, `machine_id` and `system_uuid`. They are
+refreshed with machine info, every `-update_machine_info_interval` (5m). So
+an MTU changed after boot (stormpump applying DHCP option 26) shows within
+that interval.
+
 It needs read access to the whole cgroup v2 tree, to every container's
 `/proc/<pid>`, and to the runtime sockets. In practice that means root, or on
 stormcos, the `host` profile with the pid and uts namespaces shared.

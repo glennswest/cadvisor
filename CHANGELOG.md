@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### 2026-11-07
+- **feat:** `machine_nic_mtu_bytes` and `machine_nic_speed_mbps` gauges, one per device in machine info's `network_devices`, labelled `device`, `mac` and the machine labels (#29, stormcos#637). Beyond v0.49.2. They refresh with machine info (`-update_machine_info_interval`), so a later MTU change shows. Test: `each_nic_gets_an_mtu_and_a_speed`.
+- **docs:** README metrics section: the two NIC families.
 - **test:** a VM's workload record (`kind: vm`, #15) gives the hypervisor's cgroup the VMI's namespace and name, its `vm-<uid>` id and the `kubevirt.io/*` labels, with no network off the pod network (`a_vm_record_names_its_vmi`).
 - **docs:** README: how a VM is reported (#15).
 - **feat:** bearer auth by TokenReview + SubjectAccessReview (#27, the owner's decision (A) on stormcos#143). With `--auth-mode review`, a caller's own ServiceAccount token is reviewed against `--kube-apiserver`, checked against `--kube-ca-file` (required with https). cadvisor calls the reviews with its own token from `--kube-token-file`; both files are re-read when replaced. The permission asked is `get` on `nodes/metrics` for `--kube-node-name` (default: the hostname), as upstream's kubelet authorises `/metrics/cadvisor`. Results: `401` for an unknown token, `403` without the permission, `503` when the apiserver can't answer. Outcomes are cached 30 s per token and verb; errors are not. `--bearer-token-file` stays as an extra accepted list, and the health paths stay open. Tests: `review.rs` unit tests (a fake apiserver over http and over https with a CA) and `tests/review_auth.rs` (the real binary).
