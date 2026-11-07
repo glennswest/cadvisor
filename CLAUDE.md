@@ -201,10 +201,8 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #3 done in code; stormcos pods stay `id`-only on nodes until stormcos#391
   (host `/run` → `/hostrun` in cadvisor's container). (CRI-O's `ContainerReference.namespace = "crio"` is
   upstream's own value, not a gap.)
-- #12 the test suites have not run on a node yet (C2NR0Q2 down; see above).
-  Latest (2026-09-28): C2NR0Q2's :5100 answers again; the furthest run
-  (stormcentral fe3fc66b32) broke at the image push (stormblock-registry#56,
-  fixed in v0.24.1, deploy on C2NR0Q2 unconfirmed).
+- #12 `long` has not run on a node yet (queued for the night window, run
+  9bbdca4d90); short and medium pass (see above).
 - #19 the test crate talks plain HTTP without a token (`test/src/cad.rs`);
   it needs https + a token once stormcos#143 turns TLS/auth on in the golden.
 - The version is still 0.1.0: the #14 fix is in golden cc73674e1ff2 without a
