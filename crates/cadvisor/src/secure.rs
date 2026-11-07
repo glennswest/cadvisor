@@ -1,11 +1,13 @@
-//! TLS and bearer-token auth for the main listener (#4).
+//! TLS and bearer auth for the main listener (#4, #27).
 //!
 //! Both are off by default, as in upstream cadvisor. On stormcos the golden
-//! is to turn both on (stormcos#143, not done yet): a stormcert-issued
-//! certificate (`--tls-cert-file`, `--tls-key-file`) and a token file
-//! (`--bearer-token-file`). With a token
-//! file, every path needs `Authorization: Bearer <token>` except the health
-//! paths, which stormd probes without one.
+//! is to turn both on (stormcos#143): a stormcert-issued certificate
+//! (`--tls-cert-file`, `--tls-key-file`) and `--auth-mode review`, where a
+//! caller's own ServiceAccount token is checked by TokenReview +
+//! SubjectAccessReview ([`crate::review`]). `--bearer-token-file` is a
+//! static list of accepted tokens, alone or beside the reviews. With either,
+//! every path needs `Authorization: Bearer <token>` except the health paths,
+//! which stormd probes without one.
 //!
 //! The certificate, key and tokens are files that get replaced (renewal,
 //! rotation). Each is re-read when its mtime, size or inode changes, checked
@@ -182,16 +184,46 @@ pub fn accepted(tokens: &[Vec<u8>], presented: Option<&[u8]>) -> bool {
 /// https, unverified), as with the kubelet's and stormblock's health paths.
 pub const HEALTH_PATHS: [&str; 3] = ["/healthz", "/-/healthy", "/-/ready"];
 
-/// Middleware: `401` with `WWW-Authenticate: Bearer` unless the request is
-/// for a health path or carries one of the tokens. Unknown paths get `401`
-/// too, so an anonymous client learns nothing about what is served.
-pub async fn require_bearer(State(tokens): State<Arc<Watched<Tokens>>>, req: Request, next: Next) -> Response {
-    if HEALTH_PATHS.contains(&req.uri().path())
-        || accepted(&tokens.get(), bearer(req.headers().get(header::AUTHORIZATION)))
-    {
-        next.run(req).await
-    } else {
-        (StatusCode::UNAUTHORIZED, [(header::WWW_AUTHENTICATE, "Bearer")], "Unauthorized\n").into_response()
+/// What a request is checked against: the token file, the reviews, or both.
+#[derive(Debug, Default)]
+pub struct Auth {
+    pub tokens: Option<Arc<Watched<Tokens>>>,
+    pub reviewer: Option<Arc<crate::review::Reviewer>>,
+}
+
+fn unauthorized() -> Response {
+    (StatusCode::UNAUTHORIZED, [(header::WWW_AUTHENTICATE, "Bearer")], "Unauthorized\n").into_response()
+}
+
+/// Middleware: health paths pass. Otherwise a bearer is needed: one in the
+/// token file passes, else the reviews decide (`401` for a token the
+/// apiserver does not know, `403` for one without `get nodes/metrics`, `503`
+/// when the apiserver cannot answer). Unknown paths are checked the same
+/// way, so an anonymous client learns nothing about what is served.
+pub async fn require_auth(State(auth): State<Arc<Auth>>, req: Request, next: Next) -> Response {
+    if HEALTH_PATHS.contains(&req.uri().path()) {
+        return next.run(req).await;
+    }
+    let Some(token) = bearer(req.headers().get(header::AUTHORIZATION)) else {
+        return unauthorized();
+    };
+    if auth.tokens.as_ref().is_some_and(|t| accepted(&t.get(), Some(token))) {
+        return next.run(req).await;
+    }
+    let Some(reviewer) = &auth.reviewer else {
+        return unauthorized();
+    };
+    let token = token.to_vec();
+    match reviewer.decide(&token, crate::review::verb(req.method())).await {
+        Ok(crate::review::Decision::Allowed) => next.run(req).await,
+        Ok(crate::review::Decision::Unauthenticated) => unauthorized(),
+        Ok(crate::review::Decision::Forbidden) => {
+            (StatusCode::FORBIDDEN, "Forbidden: needs get on nodes/metrics\n").into_response()
+        }
+        Err(e) => {
+            tracing::warn!(error = %format!("{e:#}"), "token review failed");
+            (StatusCode::SERVICE_UNAVAILABLE, "authorization unavailable\n").into_response()
+        }
     }
 }
 

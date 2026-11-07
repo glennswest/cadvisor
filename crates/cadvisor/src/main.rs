@@ -12,6 +12,8 @@ use clap::Parser;
 
 #[cfg(target_os = "linux")]
 mod secure;
+#[cfg(target_os = "linux")]
+mod review;
 
 pub const CADVISOR_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -105,6 +107,32 @@ pub struct Args {
     /// Empty = no auth
     #[arg(long = "bearer-token-file", alias = "bearer_token_file", default_value = "")]
     pub bearer_token_file: String,
+
+    /// `review`: check a caller's bearer by TokenReview + SubjectAccessReview
+    /// (`get nodes/metrics`) against --kube-apiserver; tokens in
+    /// --bearer-token-file are accepted too. Empty = only --bearer-token-file
+    /// (if set). Not in upstream
+    #[arg(long = "auth-mode", alias = "auth_mode", default_value = "")]
+    pub auth_mode: String,
+
+    /// The apiserver for the reviews, `https://host[:port]`
+    #[arg(long = "kube-apiserver", alias = "kube_apiserver", default_value = "")]
+    pub kube_apiserver: String,
+
+    /// PEM CA bundle that signed the apiserver's certificate. Re-read when
+    /// replaced
+    #[arg(long = "kube-ca-file", alias = "kube_ca_file", default_value = "")]
+    pub kube_ca_file: String,
+
+    /// cadvisor's own ServiceAccount token, sent with the reviews (it needs
+    /// create on tokenreviews and subjectaccessreviews). Re-read when replaced
+    #[arg(long = "kube-token-file", alias = "kube_token_file", default_value = "")]
+    pub kube_token_file: String,
+
+    /// The node name in the SubjectAccessReview (`nodes/<name>/metrics`).
+    /// Empty = the hostname
+    #[arg(long = "kube-node-name", alias = "kube_node_name", default_value = "")]
+    pub kube_node_name: String,
 }
 
 /// Accepts Go-style single-dash long flags: `-port 8080` -> `--port 8080`.
@@ -190,9 +218,33 @@ fn main() -> anyhow::Result<()> {
     } else {
         Some(secure::tokens(std::path::Path::new(&args.bearer_token_file))?)
     };
-    if tokens.is_some() && tls.is_none() {
-        tracing::warn!("--bearer-token-file without TLS: tokens cross the network in clear");
+    let reviewer = match args.auth_mode.as_str() {
+        "" => None,
+        "review" => {
+            if args.kube_apiserver.is_empty() || args.kube_token_file.is_empty() {
+                anyhow::bail!("--auth-mode review needs --kube-apiserver and --kube-token-file");
+            }
+            let node = if args.kube_node_name.is_empty() { review::hostname() } else { args.kube_node_name.clone() };
+            let ca = (!args.kube_ca_file.is_empty()).then(|| std::path::PathBuf::from(&args.kube_ca_file));
+            let r = review::Reviewer::new(
+                &args.kube_apiserver,
+                ca.as_deref(),
+                std::path::Path::new(&args.kube_token_file),
+                &node,
+            )?;
+            if !r.endpoint().tls {
+                tracing::warn!("--kube-apiserver is plain http: tokens cross the network in clear");
+            }
+            tracing::info!(apiserver = %args.kube_apiserver, node, "auth by TokenReview + SubjectAccessReview");
+            Some(std::sync::Arc::new(r))
+        }
+        other => anyhow::bail!("--auth-mode {other:?}: want review, or empty"),
+    };
+    if (tokens.is_some() || reviewer.is_some()) && tls.is_none() {
+        tracing::warn!("bearer auth without TLS: tokens cross the network in clear");
     }
+    let auth = (tokens.is_some() || reviewer.is_some())
+        .then(|| std::sync::Arc::new(secure::Auth { tokens, reviewer }));
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -238,8 +290,8 @@ fn main() -> anyhow::Result<()> {
                 .route("/-/ready", axum::routing::get(|| async { "ok" }))
                 .merge(cadvisor_metrics::router(manager.clone(), metrics_opts))
                 .merge(cadvisor_api::router(manager.clone()));
-            if let Some(tokens) = tokens {
-                app = app.layer(axum::middleware::from_fn_with_state(tokens, secure::require_bearer));
+            if let Some(auth) = auth {
+                app = app.layer(axum::middleware::from_fn_with_state(auth, secure::require_auth));
             }
 
             let ip = if args.listen_ip.is_empty() { "0.0.0.0" } else { &args.listen_ip };
