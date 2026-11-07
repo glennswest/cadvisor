@@ -256,8 +256,8 @@ On stormcos these are not turned on yet (stormcos#143). The golden needs:
 - an https liveness URL;
 - `get nodes/metrics` for its scrapers (ironprom, kube-apiserver).
 
-stormcos#143 also drops the anonymous `cadvisor.storm1.g8.lo` route
-meanwhile.
+The anonymous `cadvisor.storm1.g8.lo` route is already gone (stormcos
+`85-routes.yaml`: "Not routed: cadvisor"). stormcos#143 sets the flags above.
 
 ## Ports
 
@@ -265,7 +265,7 @@ meanwhile.
 |---|---|---|
 | Upstream / RPM default | 8080 | `--port` default |
 | stormcos node | 9096 | `argv = ["--port", "9096", "--listen-ip", "0.0.0.0"]` in cadvisor's entry in stormcentral's component registry (its database; `stormcentral component export`). 9095 belongs to stormvm. |
-| stormcos ingress | `cadvisor.storm1.g8.lo` → `127.0.0.1:9096` | HTTPRoute in `stormcos/deploy/manifests/85-routes.yaml`, served by stormlb. It is unauthenticated, and stormcos#143 drops it. stormlb cannot reach a TLS-only backend (stormlb#13). |
+| stormcos ingress | none | The HTTPRoute was dropped (it was unauthenticated; stormlb#13 is closed). Scrapers reach `STORM_NODE:9096` directly. |
 
 ## How it ships
 
@@ -293,8 +293,8 @@ is the authority for how goldens are built.** What that means here:
   be composed.
 - Sibling crates come from `Cargo.lock`. A fix in a dependency does not arrive
   until `cargo update`.
-- The golden is a musl build of Linux-only code, so it has to be built on dev,
-  never on macOS.
+- The golden is a musl build of Linux-only code, so it has to be built by
+  `sc-build` (a build VM), never on macOS.
 
 **As an RPM/DEB** for hosts that are not stormcos. `deploy/packaging/nfpm.yaml`
 makes the `cadvisor-rs` package. It contains `/usr/bin/cadvisor`, the
@@ -309,7 +309,7 @@ systemctl enable --now cadvisor
 
 ## Building and testing
 
-Builds run on `dev.g8.lo` through `sc-build`, never as root, and never on the
+Builds run on a fresh build VM through `sc-build` (dev is retired), never as root, and never on the
 stormcentral VM. Commit and push first, because `sc-build` builds the pushed
 commit in a scratch directory and then deletes it:
 
@@ -396,8 +396,8 @@ passed 17/17 at 65c5309 on pvetest2 (`ddf1d9f080`) and server8 (`a17e84f7f5`).
 That run covered every endpoint and error contract, events, OOM (a 48 MiB
 limit → `oom` + `oomKill`), accuracy (0.396–0.500 cores against a 0.5 load,
 128 MiB) and 4–12 concurrent workload pods. The first node run found
-cadvisor's container had no cgroup2 tree. stormcos#520 fixed that by binding
-the host's `/sys/fs/cgroup` read-only. `long` (480 min budget) runs only on
+cadvisor's container had no cgroup2 tree. stormcos#520 (closed) fixed that by
+binding the host's `/sys/fs/cgroup` read-only. `long` (480 min budget) runs only on
 a pve VM in the night window: run `9bbdca4d90` is queued on pvetest2.
 
 The suites talk plain HTTP and send no token. Once the golden turns on TLS

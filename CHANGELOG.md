@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### 2026-11-07
+- **docs:** stale statements removed (#28, #23): dev is retired (builds are sc-build VMs), the ingress route is gone, stormcos#520 and rustkube-node#84 are closed, #15's blockers updated.
 - **feat:** `machine_nic_mtu_bytes` and `machine_nic_speed_mbps` gauges, one per device in machine info's `network_devices`, labelled `device`, `mac` and the machine labels (#29, stormcos#637). Beyond v0.49.2. They refresh with machine info (`-update_machine_info_interval`), so a later MTU change shows. Test: `each_nic_gets_an_mtu_and_a_speed`.
 - **docs:** README metrics section: the two NIC families.
 - **test:** a VM's workload record (`kind: vm`, #15) gives the hypervisor's cgroup the VMI's namespace and name, its `vm-<uid>` id and the `kubevirt.io/*` labels, with no network off the pod network (`a_vm_record_names_its_vmi`).

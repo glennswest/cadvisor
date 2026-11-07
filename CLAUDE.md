@@ -164,7 +164,7 @@ enrichment. Seven crates under `crates/` — see README.md.
   runtime applies no limit), accuracy vs a known load, many pods, concurrent
   scrapes. long = waves of workload pods sized from the machine, measuring
   discovery latency, scrape time, cadvisor RSS/fds and leftover containers.
-  Status (2026-09-27): all of `test/` pushed (55babdc…18234cb). On dev via
+  Status (2026-09-27): all of `test/` pushed (55babdc…18234cb). Via
   sc-build: 20 unit tests + harness (short and medium against the real
   binary, pod tests skipped) pass; `test/build.sh --locked` → 3.9 MB
   static-pie; rootless podman build of test/Containerfile OK; image runs
@@ -217,7 +217,7 @@ enrichment. Seven crates under `crates/` — see README.md.
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
   unless flags are set; the stormcos golden does not set them yet (stormcos#143: cert, token, https
-  liveness; the anonymous route is dropped meanwhile; stormlb#13).
+  liveness; the anonymous route is already dropped).
 - #3 done in code; stormcos pods stay `id`-only on nodes until stormcos#391
   (host `/run` → `/hostrun` in cadvisor's container). (CRI-O's `ContainerReference.namespace = "crio"` is
   upstream's own value, not a gap.)
