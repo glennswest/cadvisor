@@ -174,6 +174,36 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
     }
 
+    /// A VMI's hypervisor (rustkube-node#84 `kind: vm`, cadvisor#15): the
+    /// VMI's namespace and name in the same labels a pod's containers carry,
+    /// plus KubeVirt's; network only when it is on the pod network.
+    #[test]
+    fn a_vm_record_names_its_vmi() {
+        let d = scratch("vm");
+        std::fs::write(
+            d.join("wvm7-2.json"),
+            r#"{"cgroup":"/stormpump/wvm7-2","pid":900,"kind":"vm","reports_network":false,
+                "namespace":"default","pod":"fedora-1","pod_uid":"vmi-uid-1",
+                "container":"hypervisor","container_id":"vm-vmi-uid-1","image":"",
+                "labels":{"io.kubernetes.pod.namespace":"default",
+                          "io.kubernetes.pod.name":"fedora-1",
+                          "io.kubernetes.pod.uid":"vmi-uid-1",
+                          "io.kubernetes.container.name":"hypervisor",
+                          "kubevirt.io/domain":"fedora-1",
+                          "kubevirt.io/created-by":"vmi-uid-1"}}"#,
+        )
+        .unwrap();
+        let meta = WorkloadRecords::new(d.to_str().unwrap()).lookup("/stormpump/wvm7-2").unwrap().into_meta();
+        assert_eq!(meta.id, "vm-vmi-uid-1");
+        assert_eq!(meta.aliases, ["vm-vmi-uid-1"]);
+        assert_eq!(meta.labels["io.kubernetes.pod.namespace"], "default");
+        assert_eq!(meta.labels["io.kubernetes.pod.name"], "fedora-1");
+        assert_eq!(meta.labels["kubevirt.io/domain"], "fedora-1");
+        assert_eq!(meta.init_pid, Some(900));
+        assert!(!meta.reports_network, "a VM off the pod network has no netns of its own to count");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
     #[test]
     fn only_the_named_cgroup_matches() {
         let d = scratch("match");

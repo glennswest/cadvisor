@@ -58,6 +58,15 @@ A slide deck on its purpose and functionality is in
   `/hostrun/rustkube/workloads` (cadvisor's stormcos container, once
   stormcos#391 mounts the host's `/run` there). Until then stormcos pods stay
   raw cgroups with only `id`.
+- **VMs** (#15): a VMI's hypervisor is a stormpump workload with its own
+  cgroup and a `kind: vm` record. So it is reported as its own container
+  with the VMI's namespace and name in `io.kubernetes.pod.{namespace,name}`
+  (container `hypervisor`, id `vm-<vmi uid>`, plus `kubevirt.io/domain` and
+  `kubevirt.io/created-by`). It has CPU, memory and `io.stat` blkio (the
+  volumes get device names since #18). Its spec shows no memory limit,
+  because the hypervisor gets only `memory.low`. Network is counted only
+  for a VM on the pod network, from its pid's netns (`reports_network`;
+  rustkube-node#88, stormvm#16). SLIRP traffic is on no interface.
 - **Events.** It records container creation and deletion. It also records
   `oom` + `oomKill` events whenever `memory.events` `oom_kill` goes up. Events
   are served on `/api/v1.3/events` and `/api/v2.x/events`.
