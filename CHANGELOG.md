@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### 2026-11-10
+- **fix(test):** `long` (#12): the first night run (9bbdca4d90, pvetest2, 65c5309) failed all 306 waves for two suite bugs, not cadvisor ones. (1) The hold scraped `/metrics` the moment the wave's pods were found. A cgroup that has used no CPU yet has no `container_cpu_usage_seconds_total` (upstream emits none at usage 0), so the first scrape always missed one. Each of the six scrapes now comes after a 10 s pause. (2) Residue was counted against a container count taken once before wave 1, so one container that appeared and stayed read as "1 left over" in every wave. It is now the containers new since the wave began, minus ancestors of the wave's own containers (a QoS parent such as `/stormpump/pods/besteffort`). The first five are named in the wave's record (`residue_names`). Test: `residue_is_what_the_wave_left_not_its_parents`. The same run showed cadvisor steady across 306 waves: RSS 60–62 MB, 13 fds, discovery ≤ 17 ms, scrape ≤ 8 ms, drain ~503 ms.
+
 ### 2026-11-07
 - **docs:** stale statements removed (#28, #23): dev is retired (builds are sc-build VMs), the ingress route is gone, stormcos#520 and rustkube-node#84 are closed, #15's blockers updated.
 - **feat:** `machine_nic_mtu_bytes` and `machine_nic_speed_mbps` gauges, one per device in machine info's `network_devices`, labelled `device`, `mac` and the machine labels (#29, stormcos#637). Beyond v0.49.2. They refresh with machine info (`-update_machine_info_interval`), so a later MTU change shows. Test: `each_nic_gets_an_mtu_and_a_speed`.

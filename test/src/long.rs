@@ -40,6 +40,8 @@ pub struct Wave {
     pub scrape_ms: u128,
     pub drain_ms: u128,
     pub residue: usize,
+    /// The first few left-over names, so a run says what they are.
+    pub residue_names: Vec<String>,
     pub rss: Option<u64>,
     pub fds: Option<u64>,
 }
@@ -62,7 +64,6 @@ pub async fn run(env: &Env, r: &mut Report) {
     let mem = machine["memory_capacity"].as_u64().unwrap_or(mib(1024));
     let full = size(cores, mem);
     let me = find_self(&ctx.cad).await;
-    let baseline = ctx.cad.names().await.map(|n| n.len()).unwrap_or(0);
 
     let mut waves: Vec<Wave> = Vec::new();
     // Vary the size: full, half, three quarters, full, …
@@ -71,10 +72,10 @@ pub async fn run(env: &Env, r: &mut Report) {
     while env.remaining() > RESERVE {
         let n = ((full as f64 * mix[i % mix.len()]) as usize).max(2);
         let t = Instant::now();
-        let (o, w) = wave(env, &ctx, i + 1, n, me.as_deref(), baseline).await;
+        let (o, w) = wave(env, &ctx, i + 1, n, me.as_deref()).await;
         let extra = format!(
-            "\"wave\": {}, \"pods\": {}, \"discover_ms\": {}, \"scrape_ms\": {}, \"drain_ms\": {}, \"residue\": {}, \"cadvisor_rss\": {}, \"cadvisor_fds\": {}",
-            w.n, w.pods, w.discover_ms, w.scrape_ms, w.drain_ms, w.residue, opt(w.rss), opt(w.fds)
+            "\"wave\": {}, \"pods\": {}, \"discover_ms\": {}, \"scrape_ms\": {}, \"drain_ms\": {}, \"residue\": {}, \"cadvisor_rss\": {}, \"cadvisor_fds\": {}, \"residue_names\": {:?}",
+            w.n, w.pods, w.discover_ms, w.scrape_ms, w.drain_ms, w.residue, opt(w.rss), opt(w.fds), w.residue_names
         );
         let failed = matches!(o, Outcome::Fail(_) | Outcome::Infra(_));
         r.record(&format!("wave-{}", i + 1), o, t.elapsed().as_millis(), Some(&extra));
@@ -105,7 +106,7 @@ fn opt(v: Option<u64>) -> String {
     v.map(|x| x.to_string()).unwrap_or_else(|| "null".into())
 }
 
-async fn wave(env: &Env, ctx: &Ctx, n: usize, pods: usize, me: Option<&str>, baseline: usize) -> (Outcome, Wave) {
+async fn wave(env: &Env, ctx: &Ctx, n: usize, pods: usize, me: Option<&str>) -> (Outcome, Wave) {
     let mut w = Wave { n, pods, ..Wave::default() };
     let before: HashSet<String> = match ctx.cad.names().await {
         Ok(b) => b,
@@ -124,10 +125,14 @@ async fn wave(env: &Env, ctx: &Ctx, n: usize, pods: usize, me: Option<&str>, bas
     let names: Vec<String> = works.iter().filter_map(|x| x.container.clone()).collect();
     w.discover_ms = works.iter().filter_map(|x| x.discovery()).max().unwrap_or_default().as_millis();
 
-    // Hold: scrape a few times, every container in every scrape.
+    // Hold: scrape a few times, every container in every scrape. Each scrape
+    // comes after a pause: a cgroup found the moment its pod runs may not have
+    // used any CPU yet, and with usage 0 cadvisor (as upstream) emits no
+    // container_cpu_usage_seconds_total for it (long run 9bbdca4d90).
     let mut scrape = Vec::new();
     let mut hold_err = None;
     for _ in 0..6 {
+        tokio::time::sleep(Duration::from_secs(10)).await;
         match ctx.cad.metrics().await.and_then(|(t, dt)| Ok((expo::parse(&t)?, dt))) {
             Ok((e, dt)) => {
                 scrape.push(dt.as_millis());
@@ -139,7 +144,6 @@ async fn wave(env: &Env, ctx: &Ctx, n: usize, pods: usize, me: Option<&str>, bas
                 hold_err.get_or_insert(e);
             }
         }
-        tokio::time::sleep(Duration::from_secs(10)).await;
     }
     w.scrape_ms = if scrape.is_empty() { 0 } else { scrape.iter().sum::<u128>() / scrape.len() as u128 };
 
@@ -157,7 +161,12 @@ async fn wave(env: &Env, ctx: &Ctx, n: usize, pods: usize, me: Option<&str>, bas
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
-    w.residue = ctx.cad.names().await.map(|now| now.len().saturating_sub(baseline)).unwrap_or(0);
+    if let Ok(now) = ctx.cad.names().await {
+        let mut left = residue(&before, &now, &names);
+        w.residue = left.len();
+        left.truncate(5);
+        w.residue_names = left;
+    }
     if let Some(c) = me {
         if let Ok(p) = ctx.cad.ps(c).await {
             if let Some(p) = p.iter().find(|p| is_cadvisor(p["cmd"].as_str().unwrap_or(""))) {
@@ -182,6 +191,17 @@ async fn wave(env: &Env, ctx: &Ctx, n: usize, pods: usize, me: Option<&str>, bas
         ))
     };
     (o, w)
+}
+
+/// What a wave left behind: containers listed now that were not before the
+/// wave. An ancestor of one of the wave's containers (a QoS parent such as
+/// `/stormpump/pods/besteffort`, created with the first pod of its class and
+/// kept by the kubelet) is the node's layout, not a leftover.
+fn residue(before: &HashSet<String>, now: &HashSet<String>, wave: &[String]) -> Vec<String> {
+    let ancestor = |n: &str| wave.iter().any(|c| c.len() > n.len() && c.starts_with(n) && c.as_bytes()[n.len()] == b'/');
+    let mut v: Vec<String> = now.difference(before).filter(|n| !ancestor(n)).cloned().collect();
+    v.sort();
+    v
 }
 
 fn is_cadvisor(cmd: &str) -> bool {
@@ -247,7 +267,23 @@ mod tests {
     use super::*;
 
     fn w(n: usize, pods: usize, discover: u128, scrape: u128, residue: usize, rss: u64) -> Wave {
-        Wave { n, pods, discover_ms: discover, scrape_ms: scrape, drain_ms: 0, residue, rss: Some(mib(rss)), fds: Some(20) }
+        Wave { n, pods, discover_ms: discover, scrape_ms: scrape, drain_ms: 0, residue, residue_names: vec![], rss: Some(mib(rss)), fds: Some(20) }
+    }
+
+    #[test]
+    fn residue_is_what_the_wave_left_not_its_parents() {
+        let set = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<HashSet<String>>();
+        let before = set(&["/", "/stormpump", "/stormpump/pods"]);
+        let wave = vec!["/stormpump/pods/besteffort/w1-1".to_string(), "/stormpump/pods/besteffort/w1-2".to_string()];
+        // The QoS parent appeared with the wave and stays: not residue.
+        let now = set(&["/", "/stormpump", "/stormpump/pods", "/stormpump/pods/besteffort"]);
+        assert!(residue(&before, &now, &wave).is_empty());
+        // A wave container still listed, and an unrelated new one, are.
+        let now = set(&["/", "/stormpump", "/stormpump/pods", "/stormpump/pods/besteffort", "/stormpump/pods/besteffort/w1-2", "/x"]);
+        assert_eq!(residue(&before, &now, &wave), vec!["/stormpump/pods/besteffort/w1-2".to_string(), "/x".to_string()]);
+        // A prefix that is not a path ancestor is not excused.
+        let now = set(&["/", "/stormpump", "/stormpump/pods", "/stormpump/pods/best"]);
+        assert_eq!(residue(&before, &now, &wave), vec!["/stormpump/pods/best".to_string()]);
     }
 
     #[test]
