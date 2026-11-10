@@ -220,8 +220,10 @@ enrichment. Seven crates under `crates/` — see README.md.
   against a count taken before wave 1, so one lasting container read as 1 in
   every wave. Fixed in `test/src/long.rs` (f6885bb): pause before each
   scrape, residue = new since the wave minus the wave's ancestors, names
-  logged. Next: sc-build, re-run long in the night window, close #12 if it
-  passes.
+  logged. sc-build on 777fc33 passed (sc-build-ac02007a9f; #37 was my
+  doubled `--locked`, closed). Re-run **49313779b0** (long, 777fc33,
+  pvetest2) queued; #12 proposed `--night`. Next: `stormcentral test show
+  49313779b0`; close #12 if it passes.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
@@ -231,14 +233,14 @@ enrichment. Seven crates under `crates/` — see README.md.
   (host `/run` → `/hostrun` in cadvisor's container). (CRI-O's `ContainerReference.namespace = "crio"` is
   upstream's own value, not a gap.)
 - #12 `long`'s first run (9bbdca4d90) failed on two suite bugs, fixed
-  2026-11-10 (f6885bb); re-run pending. short and medium pass.
+  2026-11-10 (f6885bb); re-run 49313779b0 queued. short and medium pass.
 - #19 the test crate talks plain HTTP without a token (`test/src/cad.rs`);
   it needs https + a token once stormcos#143 turns TLS/auth on in the golden.
 - The version is still 0.1.0: the #14 fix is in golden cc73674e1ff2 without a
   release tag.
 
 ### Open issues (validated 2026-09-28; priorities set in stormcentral)
-- #12 P1 test container: short and medium pass on nodes; long fixed after run 9bbdca4d90, re-run pending.
+- #12 P1 test container: short and medium pass on nodes; long fixed after run 9bbdca4d90, re-run 49313779b0 queued.
 - #3 P1 pod metadata: workload-record client done (2026-11-07); live check
   waits on stormcos#391.
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
