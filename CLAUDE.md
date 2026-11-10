@@ -213,6 +213,15 @@ enrichment. Seven crates under `crates/` — see README.md.
   window (22:00–07:00 America/Chicago). Run 9bbdca4d90 is queued on
   pvetest2, and #12 is proposed `--night` to check it. Next: `stormcentral
   test show 9bbdca4d90`; if it passes, close #12; if it fails, fix it.
+  **2026-11-10: long 9bbdca4d90 failed, 306 waves, for two suite bugs**
+  (cadvisor itself steady: RSS 60–62 MB, 13 fds, scrape ≤ 8 ms). The hold
+  scraped /metrics at once, before the new cgroup had any CPU usage (no
+  `container_cpu_usage_seconds_total` at 0, as upstream). Residue was counted
+  against a count taken before wave 1, so one lasting container read as 1 in
+  every wave. Fixed in `test/src/long.rs` (f6885bb): pause before each
+  scrape, residue = new since the wave minus the wave's ancestors, names
+  logged. Next: sc-build, re-run long in the night window, close #12 if it
+  passes.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
@@ -221,15 +230,15 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #3 done in code; stormcos pods stay `id`-only on nodes until stormcos#391
   (host `/run` → `/hostrun` in cadvisor's container). (CRI-O's `ContainerReference.namespace = "crio"` is
   upstream's own value, not a gap.)
-- #12 `long` has not run on a node yet (queued for the night window, run
-  9bbdca4d90); short and medium pass (see above).
+- #12 `long`'s first run (9bbdca4d90) failed on two suite bugs, fixed
+  2026-11-10 (f6885bb); re-run pending. short and medium pass.
 - #19 the test crate talks plain HTTP without a token (`test/src/cad.rs`);
   it needs https + a token once stormcos#143 turns TLS/auth on in the golden.
 - The version is still 0.1.0: the #14 fix is in golden cc73674e1ff2 without a
   release tag.
 
 ### Open issues (validated 2026-09-28; priorities set in stormcentral)
-- #12 P1 test container: short and medium pass on nodes; long run 9bbdca4d90 queued (night).
+- #12 P1 test container: short and medium pass on nodes; long fixed after run 9bbdca4d90, re-run pending.
 - #3 P1 pod metadata: workload-record client done (2026-11-07); live check
   waits on stormcos#391.
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
