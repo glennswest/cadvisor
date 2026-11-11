@@ -227,7 +227,8 @@ enrichment. Seven crates under `crates/` — see README.md.
   **2026-11-11: 49313779b0 did not start.** stormcentral restarted while it
   waited for pvetest2. When it re-queued, 418 min were left in the window and
   it needs 480 (filed stormcentral#1356). It is still queued for the next
-  window. Nothing to change in cadvisor; #12 proposed `--night` again.
+  window. Nothing to change in cadvisor; #12 proposed `--after
+  stormcentral#1356` (an item in progress cannot be re-proposed `--night`).
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
