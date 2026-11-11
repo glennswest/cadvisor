@@ -224,6 +224,10 @@ enrichment. Seven crates under `crates/` — see README.md.
   doubled `--locked`, closed). Re-run **49313779b0** (long, 777fc33,
   pvetest2) queued; #12 proposed `--night`. Next: `stormcentral test show
   49313779b0`; close #12 if it passes.
+  **2026-11-11: 49313779b0 did not start.** stormcentral restarted while it
+  waited for pvetest2. When it re-queued, 418 min were left in the window and
+  it needs 480 (filed stormcentral#1356). It is still queued for the next
+  window. Nothing to change in cadvisor; #12 proposed `--night` again.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
@@ -240,7 +244,7 @@ enrichment. Seven crates under `crates/` — see README.md.
   release tag.
 
 ### Open issues (validated 2026-09-28; priorities set in stormcentral)
-- #12 P1 test container: short and medium pass on nodes; long fixed after run 9bbdca4d90, re-run 49313779b0 queued.
+- #12 P1 test container: short and medium pass on nodes; long fixed after run 9bbdca4d90, re-run 49313779b0 queued (missed 2026-11-10's window: stormcentral#1356).
 - #3 P1 pod metadata: workload-record client done (2026-11-07); live check
   waits on stormcos#391.
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
