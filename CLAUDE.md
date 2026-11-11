@@ -229,6 +229,12 @@ enrichment. Seven crates under `crates/` — see README.md.
   it needs 480 (filed stormcentral#1356). It is still queued for the next
   window. Nothing to change in cadvisor; #12 proposed `--after
   stormcentral#1356` (an item in progress cannot be re-proposed `--night`).
+  **2026-11-11 18:20 UTC:** stormcentral#1356 is fixed (dc06b0e; a restart
+  keeps the night, and long night runs go first). 49313779b0 is still queued
+  for tonight. There is no way to park an item until a run ends, so I filed
+  stormcentral#1357 (`--after-run`). #12 is proposed `--after
+  stormcentral#1357`, and the master is asked to retry it once the run
+  reports. Next: `stormcentral test show 49313779b0`; close #12 if it passed.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
@@ -245,7 +251,7 @@ enrichment. Seven crates under `crates/` — see README.md.
   release tag.
 
 ### Open issues (validated 2026-09-28; priorities set in stormcentral)
-- #12 P1 test container: short and medium pass on nodes; long fixed after run 9bbdca4d90, re-run 49313779b0 queued (missed 2026-11-10's window: stormcentral#1356).
+- #12 P1 test container: short and medium pass on nodes; long fixed after run 9bbdca4d90, re-run 49313779b0 queued for 2026-11-11's window (#1356 fixed; held after stormcentral#1357).
 - #3 P1 pod metadata: workload-record client done (2026-11-07); live check
   waits on stormcos#391.
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
