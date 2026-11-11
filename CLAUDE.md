@@ -235,6 +235,10 @@ enrichment. Seven crates under `crates/` — see README.md.
   stormcentral#1357 (`--after-run`). #12 is proposed `--after
   stormcentral#1357`, and the master is asked to retry it once the run
   reports. Next: `stormcentral test show 49313779b0`; close #12 if it passed.
+  **2026-11-11 18:35 UTC:** #1357 closed (f742280), but the deployed
+  stormcentral is 735dbaa with no image of f742280, so `--after-run` is
+  refused (400) and the item can't be held on the run. Master asked (note)
+  to hold #12 `--after-run 49313779b0` once it installs. Run still queued.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
