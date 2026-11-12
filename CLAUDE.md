@@ -239,6 +239,12 @@ enrichment. Seven crates under `crates/` — see README.md.
   stormcentral is 735dbaa with no image of f742280, so `--after-run` is
   refused (400) and the item can't be held on the run. Master asked (note)
   to hold #12 `--after-run 49313779b0` once it installs. Run still queued.
+  **2026-11-12: 49313779b0 errored without starting.** The pod sat Pending
+  all night: pvetest2's kubelet hit `No space left on device` on the
+  `results` emptyDir (FailedMount ×2866). That is a machine fault, filed as
+  stormcentral#1366 (pvetest2's disk, and the runner should fail fast on it).
+  Re-queued as **ad5d544d14** (long, 777fc33, pvetest1). Next:
+  `stormcentral test show ad5d544d14`; close #12 if it passes.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
@@ -248,14 +254,14 @@ enrichment. Seven crates under `crates/` — see README.md.
   (host `/run` → `/hostrun` in cadvisor's container). (CRI-O's `ContainerReference.namespace = "crio"` is
   upstream's own value, not a gap.)
 - #12 `long`'s first run (9bbdca4d90) failed on two suite bugs, fixed
-  2026-11-10 (f6885bb); re-run 49313779b0 queued. short and medium pass.
+  2026-11-10 (f6885bb); re-run ad5d544d14 queued (49313779b0 never started: stormcentral#1366). short and medium pass.
 - #19 the test crate talks plain HTTP without a token (`test/src/cad.rs`);
   it needs https + a token once stormcos#143 turns TLS/auth on in the golden.
 - The version is still 0.1.0: the #14 fix is in golden cc73674e1ff2 without a
   release tag.
 
 ### Open issues (validated 2026-09-28; priorities set in stormcentral)
-- #12 P1 test container: short and medium pass on nodes; long fixed after run 9bbdca4d90, re-run 49313779b0 queued for 2026-11-11's window (#1356 fixed; held after stormcentral#1357).
+- #12 P1 test container: short and medium pass on nodes; long fixed after run 9bbdca4d90; re-run 49313779b0 lost to pvetest2 ENOSPC (stormcentral#1366); ad5d544d14 queued on pvetest1.
 - #3 P1 pod metadata: workload-record client done (2026-11-07); live check
   waits on stormcos#391.
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
