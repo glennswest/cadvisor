@@ -284,6 +284,29 @@ binary at `/usr/sbin/cadvisor` in a `stormdbase` root under `stormd`, with a
 and uts namespaces and uses the `host` profile, so it sees every cgroup
 stormpump writes, not only the ones a runtime knows about.
 
+**API health probes** (#25, stormcentral#596). `/healthz` answers even when
+the real work has stopped, so the registry entry also declares cadvisor's APIs
+(`apis`). stormd probes each one inside the container with a cheap real read,
+and the node's health summary carries the result: healthy, slow, stalled or
+down.
+
+| `name` | `probe` (on :9096) | What it reads | `p50_ms` / `p99_ms` / `timeout_s` |
+|---|---|---|---|
+| `stats` | `/api/v2.0/stats?count=1` | The root container's newest housekeeping sample. The read goes through the manager's container map and the root's sample store, the locks housekeeping writes under. | 100 / 1000 / 10 |
+| `metrics` | `/metrics` | The Prometheus scrape: every container's stats. | 200 / 2000 / 10 |
+
+```
+stormcentral component edit cadvisor --set 'apis=[{"name":"stats","probe":"/api/v2.0/stats?count=1","p50_ms":100,"p99_ms":1000,"timeout_s":10},{"name":"metrics","probe":"/metrics","p50_ms":200,"p99_ms":2000,"timeout_s":10}]'
+```
+
+`restart_after_stalled_secs` is not set, so stormd never restarts cadvisor
+for a stall. No `token_file` is set either, because the golden has no auth
+yet. Once stormcos#143 turns TLS/auth on, both probes need a `token_file` and
+`health_scheme = "https"`. Before housekeeping's first sample, `stats`
+answers 200 with an empty list, so a starting cadvisor does not read as down.
+`crates/cadvisor/tests/api_probes.rs` runs the real binary against exactly
+these paths. Keep the test and this table in step.
+
 **[`stormcos/docs/goldens.md`](https://github.com/glennswest/stormcos/blob/main/docs/goldens.md)
 is the authority for how goldens are built.** What that means here:
 
