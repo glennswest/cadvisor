@@ -37,6 +37,14 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-11-13 — #25 API health declarations (stormcentral#596): `stats`
+  (`/api/v2.0/stats?count=1`, 100/1000 ms, 10 s) and `metrics` (`/metrics`,
+  200/2000 ms, 10 s), with no restart and no token_file until stormcos#143.
+  README "How it ships" has the table. `tests/api_probes.rs` runs the real
+  binary on both paths. sc-build on bdb8b47 (sc-build-685cd6a636) passed,
+  clippy clean. The registry is the owner's setting, so the `component edit`
+  went to the master by note. Shipped with a proof on the node's health
+  snapshot.
 - 2026-11-07 — #29 `machine_nic_mtu_bytes` / `machine_nic_speed_mbps` per
   machine-info NIC (labels device, mac + machine labels; beyond v0.49.2;
   refresh with machine info). Verified: `sc-build` on 32b167d
