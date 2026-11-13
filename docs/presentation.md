@@ -226,7 +226,7 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 
 | Issue | | |
 |---|---|---|
-| #12 | test container on a node | short and medium pass on nodes (2026-11-07); long queued for the night window |
+| #12 | test container on a node | done: short, medium (2026-11-07) and long (2026-11-13, 454 waves) pass on nodes |
 | #3 | pod metadata | workload-record client done; live once stormcos#391 ships |
 | #15 | per-VM stats keyed to the VMI | P2; identity and disk done; network needs rustkube-node#88 / stormvm#16 |
 | #19 | test suites need https + a token | P2; after stormcos#143 turns TLS/auth on in the golden (#4, done) |

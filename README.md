@@ -421,7 +421,10 @@ limit → `oom` + `oomKill`), accuracy (0.396–0.500 cores against a 0.5 load,
 128 MiB) and 4–12 concurrent workload pods. The first node run found
 cadvisor's container had no cgroup2 tree. stormcos#520 (closed) fixed that by
 binding the host's `/sys/fs/cgroup` read-only. `long` (480 min budget) runs only on
-a pve VM in the night window: run `9bbdca4d90` is queued on pvetest2.
+a pve VM in the night window. It passed at 777fc33 on pvetest1 (`ad5d544d14`,
+2026-11-13): 454 waves of 4–8 containers, 456 pass, 0 fail (`vm-waves`
+skipped). cadvisor's RSS stayed at 63–66 MB with 13–14 fds, scrapes took at
+most 9 ms, and discovery took at most 1.5 s. No trend in slowdown or residue.
 
 The suites talk plain HTTP and send no token. Once the golden turns on TLS
 and auth (stormcos#143), they have to speak https with a token (#19).

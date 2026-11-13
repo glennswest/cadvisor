@@ -37,6 +37,114 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-11-13 — #12 test containers (short, medium, long) per stormcentral
+  `docs/test-standard.md`, all passing on nodes. long: ad5d544d14 (777fc33,
+  pvetest1) 456 pass / 0 fail / 1 skip over 454 waves, RSS 63–66 MB, 13–14
+  fds, scrape ≤ 9 ms. short 10/10 (pvetest1, C2NR0Q2, server7), medium 17/17
+  (pvetest2, server8). History below (the in-progress log, kept for context).
+  2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
+    Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
+    `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
+    metadata + reference Job in `test/cadvisor-test.yaml`.
+    Facts the design rests on (checked 2026-09-27):
+    - stormcentral's runner (`src/testruns.rs`) builds its own Job: SA
+      `storm-test` with `*` on the run namespace only, no hostNetwork, no
+      cluster-scoped read, image not passed in env → suites read their own pod
+      (`HOSTNAME`) for the image and size waves from cadvisor's
+      `/api/v2.0/machine`, not from `nodes`.
+    - cadvisor on a node: `STORM_NODE:9096` (`--listen-ip 0.0.0.0`).
+    - stormpump names pod cgroups `/stormpump/w<tag>-<n>` (opaque), so a
+      workload pod is found through cadvisor itself: containers created since the
+      pod started (`/api/v2.0/spec?recursive=true`) whose `/api/v2.0/ps` shows
+      `/test workload <run id> …`.
+    - `ps` lists only a cgroup's own `cgroup.procs`, not descendants.
+    Suites: short = health, version, machine, /metrics, housekeeping, a workload
+    pod appears with its CPU/memory and disappears after delete. medium = every
+    endpoint and error contract, events (create/delete, stream), OOM (skip if the
+    runtime applies no limit), accuracy vs a known load, many pods, concurrent
+    scrapes. long = waves of workload pods sized from the machine, measuring
+    discovery latency, scrape time, cadvisor RSS/fds and leftover containers.
+    Status (2026-09-27): all of `test/` pushed (55babdc…18234cb). Via
+    sc-build: 20 unit tests + harness (short and medium against the real
+    binary, pod tests skipped) pass; `test/build.sh --locked` → 3.9 MB
+    static-pie; rootless podman build of test/Containerfile OK; image runs
+    `workload` (0), no env (2), short vs a real cadvisor (0). The harness found
+    #14 (duplicate series in /metrics), fixed in f083ba2 (#14 closed).
+    Strict sc-build on 991ce54: 87 tests pass. Golden golden-cadvisor-cc73674e1ff2
+    built with the #14 fix (release request stormcos#110).
+    **Blocked (2026-09-27):** the on-node run. `stormcentral test run cadvisor
+    short --tag C2NR0Q2` (run 1739abfdc4) built and pushed the image, then
+    errored: stormcentral#56 (`@@RESULT` shell quoting), and the node's
+    sbregistry could not seal the golden (401 from stormblock:
+    stormblock-registry#40). Next, once both are fixed: run short, then medium,
+    fix what they find, close #12.
+    Re-checked 2026-09-27 15:08 UTC: stormcentral#56 fixed in stormcentral
+    commit 15:07 (issue still open, deploy unconfirmed). Run 43e9193e15 (short,
+    0900b1e) got past power-on and apiserver wait, then C2NR0Q2's sbregistry
+    refused connections on :5100. Other sessions' runs on C2NR0Q2 are failing
+    its /readyz. C2NR0Q2 is the only test machine. Nothing to change in cadvisor;
+    re-run once C2NR0Q2 is healthy.
+    2026-10-10: C2NR0Q2 passes other components' runs again (rustkube-node,
+    stormblock short). Now: `stormcentral test run cadvisor short --tag
+    C2NR0Q2`, then medium; fix what they find; close #12. No
+    `test/requires.toml` needed (no privileges or cluster reads); no
+    `cadvisor-test` repo yet (stormcentral #601), so `test/` here runs.
+    **First node run, 80a8f63e07 (short, afb46a0, C2NR0Q2): 6 pass, 2 fail.**
+    It got past build, push and Job start. health, stormd-supervises, version,
+    machine, housekeeping and cleanup pass. `metrics` (no
+    `container_cpu_usage_seconds_total{id="/"}`) and `workload-discovered`
+    fail, for one cause: stormpump gives cadvisor's container a fresh sysfs
+    with an empty `/sys/fs/cgroup` (no cgroup2 bind in its boot.d unit,
+    stormcos `deploy/build-goldens.sh` `spec cadvisor`). So cadvisor saw only
+    `/`, with zero CPU. Filed **stormcos#520** (bind host /sys/fs/cgroup ro,
+    as stormdrive binds /sys). Here, c2e3c26: cadvisor refuses to start
+    without `cgroup.controllers` (upstream exits too). **No golden from
+    c2e3c26 until stormcos#520 ships** (said so on #520), or cadvisor would
+    stay down on nodes. #12 proposed `--after stormcos#520`; then re-run
+    short, then medium.
+    **2026-11-07: short passes on nodes** at 1f5c50a, 10/10 (pod tests
+    included) on pvetest1 (1b61043e4d), C2NR0Q2 (445f6b0db6) and server7
+    (1782a7b0ad); stormcos#520 shipped (golden-stormpump-4227eda0d330). Runs go
+    to a pve machine first now (stormcentral#791).
+    **medium passes**, 17/17 at 65c5309, on pvetest2 (ddf1d9f080) and server8
+    (a17e84f7f5): endpoints, error contract, events, OOM, accuracy,
+    many-containers, stormd steady. C2NR0Q2 was skipped (the pve run had not
+    finished yet). **long** (480 min budget) runs only on a pve VM in the night
+    window (22:00–07:00 America/Chicago). Run 9bbdca4d90 is queued on
+    pvetest2, and #12 is proposed `--night` to check it. Next: `stormcentral
+    test show 9bbdca4d90`; if it passes, close #12; if it fails, fix it.
+    **2026-11-10: long 9bbdca4d90 failed, 306 waves, for two suite bugs**
+    (cadvisor itself steady: RSS 60–62 MB, 13 fds, scrape ≤ 8 ms). The hold
+    scraped /metrics at once, before the new cgroup had any CPU usage (no
+    `container_cpu_usage_seconds_total` at 0, as upstream). Residue was counted
+    against a count taken before wave 1, so one lasting container read as 1 in
+    every wave. Fixed in `test/src/long.rs` (f6885bb): pause before each
+    scrape, residue = new since the wave minus the wave's ancestors, names
+    logged. sc-build on 777fc33 passed (sc-build-ac02007a9f; #37 was my
+    doubled `--locked`, closed). Re-run **49313779b0** (long, 777fc33,
+    pvetest2) queued; #12 proposed `--night`. Next: `stormcentral test show
+    49313779b0`; close #12 if it passes.
+    **2026-11-11: 49313779b0 did not start.** stormcentral restarted while it
+    waited for pvetest2. When it re-queued, 418 min were left in the window and
+    it needs 480 (filed stormcentral#1356). It is still queued for the next
+    window. Nothing to change in cadvisor; #12 proposed `--after
+    stormcentral#1356` (an item in progress cannot be re-proposed `--night`).
+    **2026-11-11 18:20 UTC:** stormcentral#1356 is fixed (dc06b0e; a restart
+    keeps the night, and long night runs go first). 49313779b0 is still queued
+    for tonight. There is no way to park an item until a run ends, so I filed
+    stormcentral#1357 (`--after-run`). #12 is proposed `--after
+    stormcentral#1357`, and the master is asked to retry it once the run
+    reports. Next: `stormcentral test show 49313779b0`; close #12 if it passed.
+    **2026-11-11 18:35 UTC:** #1357 closed (f742280), but the deployed
+    stormcentral is 735dbaa with no image of f742280, so `--after-run` is
+    refused (400) and the item can't be held on the run. Master asked (note)
+    to hold #12 `--after-run 49313779b0` once it installs. Run still queued.
+    **2026-11-12: 49313779b0 errored without starting.** The pod sat Pending
+    all night: pvetest2's kubelet hit `No space left on device` on the
+    `results` emptyDir (FailedMount ×2866). That is a machine fault, filed as
+    stormcentral#1366 (pvetest2's disk, and the runner should fail fast on it).
+    Re-queued as **ad5d544d14** (long, 777fc33, pvetest1). Next:
+    `stormcentral test show ad5d544d14`; close #12 if it passes.
 - 2026-11-13 — #25 API health declarations (stormcentral#596): `stats`
   (`/api/v2.0/stats?count=1`, 100/1000 ms, 10 s) and `metrics` (`/metrics`,
   200/2000 ms, 10 s), with no restart and no token_file until stormcos#143.
@@ -150,109 +258,7 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- 2026-09-27 — #12 test containers per stormcentral `docs/test-standard.md`.
-  Layout follows stormlb's `test/`: own cargo workspace `test/`, static musl
-  `/test <suite>` in a scratch image (`test/Containerfile`, `test/build.sh`),
-  metadata + reference Job in `test/cadvisor-test.yaml`.
-  Facts the design rests on (checked 2026-09-27):
-  - stormcentral's runner (`src/testruns.rs`) builds its own Job: SA
-    `storm-test` with `*` on the run namespace only, no hostNetwork, no
-    cluster-scoped read, image not passed in env → suites read their own pod
-    (`HOSTNAME`) for the image and size waves from cadvisor's
-    `/api/v2.0/machine`, not from `nodes`.
-  - cadvisor on a node: `STORM_NODE:9096` (`--listen-ip 0.0.0.0`).
-  - stormpump names pod cgroups `/stormpump/w<tag>-<n>` (opaque), so a
-    workload pod is found through cadvisor itself: containers created since the
-    pod started (`/api/v2.0/spec?recursive=true`) whose `/api/v2.0/ps` shows
-    `/test workload <run id> …`.
-  - `ps` lists only a cgroup's own `cgroup.procs`, not descendants.
-  Suites: short = health, version, machine, /metrics, housekeeping, a workload
-  pod appears with its CPU/memory and disappears after delete. medium = every
-  endpoint and error contract, events (create/delete, stream), OOM (skip if the
-  runtime applies no limit), accuracy vs a known load, many pods, concurrent
-  scrapes. long = waves of workload pods sized from the machine, measuring
-  discovery latency, scrape time, cadvisor RSS/fds and leftover containers.
-  Status (2026-09-27): all of `test/` pushed (55babdc…18234cb). Via
-  sc-build: 20 unit tests + harness (short and medium against the real
-  binary, pod tests skipped) pass; `test/build.sh --locked` → 3.9 MB
-  static-pie; rootless podman build of test/Containerfile OK; image runs
-  `workload` (0), no env (2), short vs a real cadvisor (0). The harness found
-  #14 (duplicate series in /metrics), fixed in f083ba2 (#14 closed).
-  Strict sc-build on 991ce54: 87 tests pass. Golden golden-cadvisor-cc73674e1ff2
-  built with the #14 fix (release request stormcos#110).
-  **Blocked (2026-09-27):** the on-node run. `stormcentral test run cadvisor
-  short --tag C2NR0Q2` (run 1739abfdc4) built and pushed the image, then
-  errored: stormcentral#56 (`@@RESULT` shell quoting), and the node's
-  sbregistry could not seal the golden (401 from stormblock:
-  stormblock-registry#40). Next, once both are fixed: run short, then medium,
-  fix what they find, close #12.
-  Re-checked 2026-09-27 15:08 UTC: stormcentral#56 fixed in stormcentral
-  commit 15:07 (issue still open, deploy unconfirmed). Run 43e9193e15 (short,
-  0900b1e) got past power-on and apiserver wait, then C2NR0Q2's sbregistry
-  refused connections on :5100. Other sessions' runs on C2NR0Q2 are failing
-  its /readyz. C2NR0Q2 is the only test machine. Nothing to change in cadvisor;
-  re-run once C2NR0Q2 is healthy.
-  2026-10-10: C2NR0Q2 passes other components' runs again (rustkube-node,
-  stormblock short). Now: `stormcentral test run cadvisor short --tag
-  C2NR0Q2`, then medium; fix what they find; close #12. No
-  `test/requires.toml` needed (no privileges or cluster reads); no
-  `cadvisor-test` repo yet (stormcentral #601), so `test/` here runs.
-  **First node run, 80a8f63e07 (short, afb46a0, C2NR0Q2): 6 pass, 2 fail.**
-  It got past build, push and Job start. health, stormd-supervises, version,
-  machine, housekeeping and cleanup pass. `metrics` (no
-  `container_cpu_usage_seconds_total{id="/"}`) and `workload-discovered`
-  fail, for one cause: stormpump gives cadvisor's container a fresh sysfs
-  with an empty `/sys/fs/cgroup` (no cgroup2 bind in its boot.d unit,
-  stormcos `deploy/build-goldens.sh` `spec cadvisor`). So cadvisor saw only
-  `/`, with zero CPU. Filed **stormcos#520** (bind host /sys/fs/cgroup ro,
-  as stormdrive binds /sys). Here, c2e3c26: cadvisor refuses to start
-  without `cgroup.controllers` (upstream exits too). **No golden from
-  c2e3c26 until stormcos#520 ships** (said so on #520), or cadvisor would
-  stay down on nodes. #12 proposed `--after stormcos#520`; then re-run
-  short, then medium.
-  **2026-11-07: short passes on nodes** at 1f5c50a, 10/10 (pod tests
-  included) on pvetest1 (1b61043e4d), C2NR0Q2 (445f6b0db6) and server7
-  (1782a7b0ad); stormcos#520 shipped (golden-stormpump-4227eda0d330). Runs go
-  to a pve machine first now (stormcentral#791).
-  **medium passes**, 17/17 at 65c5309, on pvetest2 (ddf1d9f080) and server8
-  (a17e84f7f5): endpoints, error contract, events, OOM, accuracy,
-  many-containers, stormd steady. C2NR0Q2 was skipped (the pve run had not
-  finished yet). **long** (480 min budget) runs only on a pve VM in the night
-  window (22:00–07:00 America/Chicago). Run 9bbdca4d90 is queued on
-  pvetest2, and #12 is proposed `--night` to check it. Next: `stormcentral
-  test show 9bbdca4d90`; if it passes, close #12; if it fails, fix it.
-  **2026-11-10: long 9bbdca4d90 failed, 306 waves, for two suite bugs**
-  (cadvisor itself steady: RSS 60–62 MB, 13 fds, scrape ≤ 8 ms). The hold
-  scraped /metrics at once, before the new cgroup had any CPU usage (no
-  `container_cpu_usage_seconds_total` at 0, as upstream). Residue was counted
-  against a count taken before wave 1, so one lasting container read as 1 in
-  every wave. Fixed in `test/src/long.rs` (f6885bb): pause before each
-  scrape, residue = new since the wave minus the wave's ancestors, names
-  logged. sc-build on 777fc33 passed (sc-build-ac02007a9f; #37 was my
-  doubled `--locked`, closed). Re-run **49313779b0** (long, 777fc33,
-  pvetest2) queued; #12 proposed `--night`. Next: `stormcentral test show
-  49313779b0`; close #12 if it passes.
-  **2026-11-11: 49313779b0 did not start.** stormcentral restarted while it
-  waited for pvetest2. When it re-queued, 418 min were left in the window and
-  it needs 480 (filed stormcentral#1356). It is still queued for the next
-  window. Nothing to change in cadvisor; #12 proposed `--after
-  stormcentral#1356` (an item in progress cannot be re-proposed `--night`).
-  **2026-11-11 18:20 UTC:** stormcentral#1356 is fixed (dc06b0e; a restart
-  keeps the night, and long night runs go first). 49313779b0 is still queued
-  for tonight. There is no way to park an item until a run ends, so I filed
-  stormcentral#1357 (`--after-run`). #12 is proposed `--after
-  stormcentral#1357`, and the master is asked to retry it once the run
-  reports. Next: `stormcentral test show 49313779b0`; close #12 if it passed.
-  **2026-11-11 18:35 UTC:** #1357 closed (f742280), but the deployed
-  stormcentral is 735dbaa with no image of f742280, so `--after-run` is
-  refused (400) and the item can't be held on the run. Master asked (note)
-  to hold #12 `--after-run 49313779b0` once it installs. Run still queued.
-  **2026-11-12: 49313779b0 errored without starting.** The pod sat Pending
-  all night: pvetest2's kubelet hit `No space left on device` on the
-  `results` emptyDir (FailedMount ×2866). That is a machine fault, filed as
-  stormcentral#1366 (pvetest2's disk, and the runner should fail fast on it).
-  Re-queued as **ad5d544d14** (long, 777fc33, pvetest1). Next:
-  `stormcentral test show ad5d544d14`; close #12 if it passes.
+- (none)
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
@@ -261,15 +267,12 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #3 done in code; stormcos pods stay `id`-only on nodes until stormcos#391
   (host `/run` → `/hostrun` in cadvisor's container). (CRI-O's `ContainerReference.namespace = "crio"` is
   upstream's own value, not a gap.)
-- #12 `long`'s first run (9bbdca4d90) failed on two suite bugs, fixed
-  2026-11-10 (f6885bb); re-run ad5d544d14 queued (49313779b0 never started: stormcentral#1366). short and medium pass.
 - #19 the test crate talks plain HTTP without a token (`test/src/cad.rs`);
   it needs https + a token once stormcos#143 turns TLS/auth on in the golden.
 - The version is still 0.1.0: the #14 fix is in golden cc73674e1ff2 without a
   release tag.
 
 ### Open issues (validated 2026-09-28; priorities set in stormcentral)
-- #12 P1 test container: short and medium pass on nodes; long fixed after run 9bbdca4d90; re-run 49313779b0 lost to pvetest2 ENOSPC (stormcentral#1366); ad5d544d14 queued on pvetest1.
 - #3 P1 pod metadata: workload-record client done (2026-11-07); live check
   waits on stormcos#391.
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.

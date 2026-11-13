@@ -5,6 +5,7 @@
 ### 2026-11-13
 - **feat(ship):** API health declarations for stormd (#25, stormcentral#596): `stats` (`/api/v2.0/stats?count=1`, the root container's newest sample, read under the manager's locks) and `metrics` (`/metrics`). Both are cheap real reads, not `/healthz`. The registry is the owner's setting, so the `component edit … --set apis=…` command went to the master. Test: `tests/api_probes.rs` runs the real binary against both paths and checks a p50 under 100 ms.
 - **docs:** README "How it ships": the API health probes table and the registry command.
+- **chore(test):** #12 done: `long` passed at 777fc33 on pvetest1 (run ad5d544d14): 454 waves, 456 pass, 0 fail, 1 skip (`vm-waves`, stormvm's suite). cadvisor stayed steady throughout: RSS 63–66 MB, 13–14 fds, scrape ≤ 9 ms, discovery ≤ 1.5 s, drain ~503 ms, and `trend` found no slowdown or growing residue. README "Tests on a node", presentation issue table, CLAUDE.md.
 
 ### 2026-11-12
 - **chore(test):** `long` (#12) re-run 49313779b0 never started. pvetest2's kubelet hit ENOSPC creating the pod's emptyDir, and the pod stayed Pending all night. Filed as stormcentral#1366 (machine fault, not cadvisor). Re-queued as ad5d544d14 on pvetest1.
