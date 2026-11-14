@@ -278,7 +278,12 @@ enrichment. Seven crates under `crates/` — see README.md.
 - The version is still 0.1.0: the #14 fix is in golden cc73674e1ff2 without a
   release tag.
 
-### Open issues (validated 2026-09-28; priorities set in stormcentral)
+### Open issues (validated 2026-11-14; priorities set in stormcentral)
+- #25 P0 API health probes: code and README done; the registry `apis` edit and
+  `component build cadvisor --force` are with the master (action card).
+- #34 P3 nested `/stormpump/pods/<qos>/w…` cgroups: docs now say so; no test yet.
+- #35 review auth on a joined worker (stormcos#143); #30 P3 fs counters on `/`;
+  #36 P3 rustls 0.23.46 bump; #28/#23 are docs issues this pass answers.
 - #3 P1 pod metadata: workload-record client done (2026-11-07); live check
   waits on stormcos#391.
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.

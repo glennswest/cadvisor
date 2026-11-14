@@ -44,7 +44,7 @@ A slide deck on its purpose and functionality is in
   `/proc/<pid>/net`.
 - **stormcos pods: the kubelet's workload records** (#3). On stormcos, pods
   run under stormpump, not containerd or CRI-O, in opaque cgroups
-  (`/stormpump/w<tag>-<n>`). rustkube's kubelet writes one JSON record per
+  (`/stormpump/w<tag>-<n>`, or nested under a QoS parent such as `/stormpump/pods/besteffort/w<tag>-<n>` on nodes, #34). rustkube's kubelet writes one JSON record per
   workload in the node's `/run/rustkube/workloads/<cgroup basename>.json`
   (rustkube-node#84; format in rustkube-node `docs/metrics.md`). cadvisor
   reads it for every new cgroup whose record's `cgroup` field is that cgroup:
@@ -397,7 +397,7 @@ program is `/test <suite>`. It writes one JSON line per test and exits 0
 |---|---|---|
 | `short` | < 2 min | `/healthz` and the other health paths; stormd reports cadvisor running (`:9196`); version; machine (API and `/metrics` agree); `/metrics` parses strictly (no duplicate series, a TYPE for every family, timestamps on stats); housekeeping keeps producing samples. Then one workload pod is found, its CPU and memory are reported, and it is gone after the delete. |
 | `medium` | < 30 min | The short checks again. Every v1/v2 endpoint's shape, the `400` listings and the upstream-worded `500` errors. 16 concurrent scrapes. Creation and deletion events, streamed and in the history. OOM kills, as `oom` + `oomKill` events and `container_oom_events_total`. Accuracy against half a core and 128 MiB, with `/metrics` agreeing with the API. One container per core (4–16), all found and all let go. stormd counts no restart. |
-| `long` | the night | Waves of workload containers sized from the machine: two per core, at most a quarter of memory, 4–128. Per wave it records discovery latency, scrape time, drain time, containers left over, and cadvisor's own RSS and fds. The `trend` test fails on a slowdown or on residue that grows. |
+| `long` | the night | Waves of workload containers sized from the machine: two per core, at most a quarter of memory, 4–128. Per wave it records discovery latency, scrape time (six scrapes per wave, 10 s apart, since a cgroup with no CPU use yet has no `container_cpu_usage_seconds_total`), drain time, containers left over (new since the wave began, minus ancestors of the wave's own containers), and cadvisor's own RSS and fds. The `trend` test fails on a slowdown or on residue that grows. |
 
 How it works on a node:
 
@@ -405,7 +405,7 @@ How it works on a node:
   namespace running `/test workload <marker> cpu=… mem=… secs=…`, pinned to the
   Job's node. The image name comes from reading the Job's own pod.
 - **A workload is found through cadvisor.** stormpump names pod cgroups
-  opaquely (`/stormpump/w<tag>-<n>`), so the suite looks for the new container
+  opaquely (`/stormpump/w<tag>-<n>`, nested under `/stormpump/pods/<qos>/` on nodes), so the suite looks for the new container
   whose `/api/v2.0/ps` shows the marker.
 - **Nothing cluster-scoped.** The runner's Role covers only the run's
   namespace, so waves are sized from cadvisor's `/api/v2.0/machine`, not from
@@ -418,7 +418,7 @@ On the build box, `cd test && CADVISOR_BIN=<path to cadvisor> cargo test`
 runs the unit tests. It also runs `tests/harness.rs`, which starts the real
 binary and runs `short` and `medium` against it, with the pod tests skipped.
 
-**Status (2026-11-07):** `short` and `medium` pass on nodes, pod tests
+**Status (2026-11-13):** `short` and `medium` pass on nodes, pod tests
 included. `short` passed 10/10 at 1f5c50a on pvetest1 (stormcentral run
 `1b61043e4d`), C2NR0Q2 (`445f6b0db6`) and server7 (`1782a7b0ad`). `medium`
 passed 17/17 at 65c5309 on pvetest2 (`ddf1d9f080`) and server8 (`a17e84f7f5`).

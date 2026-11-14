@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### 2026-11-14
+- **docs:** refresh from the code since 2026-11-07: README `long` suite row (pause before each scrape, residue per wave) and the nested `/stormpump/pods/<qos>/w<tag>-<n>` cgroup path (#34), test status date, presentation issue table (#25, #34, #35), CLAUDE.md open issues. No docs promise anything the code lacks that is not already an issue.
+
 ### 2026-11-13
 - **docs:** #25 reopened by its proof. The snapshot on pvetest2 (release 12.81-flowsdn) had no cadvisor `stats` row, because the registry entry still has no `apis`: the `component edit` was never run. README now gives the rebuild step too (`component build cadvisor --force`, since a registry-only change has no new commit). The two commands are back with the owner and master as an action card.
 - **feat(ship):** API health declarations for stormd (#25, stormcentral#596): `stats` (`/api/v2.0/stats?count=1`, the root container's newest sample, read under the manager's locks) and `metrics` (`/metrics`). Both are cheap real reads, not `/healthz`. The registry is the owner's setting, so the `component edit … --set apis=…` command went to the master. Test: `tests/api_probes.rs` runs the real binary against both paths and checks a p50 under 100 ms.
