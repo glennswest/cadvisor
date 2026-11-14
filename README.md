@@ -297,7 +297,13 @@ down.
 
 ```
 stormcentral component edit cadvisor --set 'apis=[{"name":"stats","probe":"/api/v2.0/stats?count=1","p50_ms":100,"p99_ms":1000,"timeout_s":10},{"name":"metrics","probe":"/metrics","p50_ms":200,"p99_ms":2000,"timeout_s":10}]'
+stormcentral component build cadvisor --force --no-wait
 ```
+
+The registry edit only takes effect when a golden is built after it. With no
+new commit, a plain `component build` skips, so the rebuild needs `--force`.
+Until then the node's API health snapshot
+(`:9094/api/plugins/health/snapshot`) has no cadvisor rows.
 
 `restart_after_stalled_secs` is not set, so stormd never restarts cadvisor
 for a stall. No `token_file` is set either, because the golden has no auth

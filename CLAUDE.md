@@ -153,6 +153,12 @@ enrichment. Seven crates under `crates/` — see README.md.
   clippy clean. The registry is the owner's setting, so the `component edit`
   went to the master by note. Shipped with a proof on the node's health
   snapshot.
+  **Reopened 2026-11-13 by the proof** (pvetest2, release 12.81-flowsdn):
+  the snapshot has no cadvisor rows. `component export` shows no `apis` on
+  cadvisor (and on no other component): the master never ran the edit. No
+  code change. The commands (edit, then `component build cadvisor --force`,
+  since a registry-only change has no new commit) went back by note and
+  `wait-owner --action`. Next, once they have run: re-ship with the same proof.
 - 2026-11-07 — #29 `machine_nic_mtu_bytes` / `machine_nic_speed_mbps` per
   machine-info NIC (labels device, mac + machine labels; beyond v0.49.2;
   refresh with machine info). Verified: `sc-build` on 32b167d

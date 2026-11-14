@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### 2026-11-13
+- **docs:** #25 reopened by its proof. The snapshot on pvetest2 (release 12.81-flowsdn) had no cadvisor `stats` row, because the registry entry still has no `apis`: the `component edit` was never run. README now gives the rebuild step too (`component build cadvisor --force`, since a registry-only change has no new commit). The two commands are back with the owner and master as an action card.
 - **feat(ship):** API health declarations for stormd (#25, stormcentral#596): `stats` (`/api/v2.0/stats?count=1`, the root container's newest sample, read under the manager's locks) and `metrics` (`/metrics`). Both are cheap real reads, not `/healthz`. The registry is the owner's setting, so the `component edit … --set apis=…` command went to the master. Test: `tests/api_probes.rs` runs the real binary against both paths and checks a p50 under 100 ms.
 - **docs:** README "How it ships": the API health probes table and the registry command.
 - **chore(test):** #12 done: `long` passed at 777fc33 on pvetest1 (run ad5d544d14): 454 waves, 456 pass, 0 fail, 1 skip (`vm-waves`, stormvm's suite). cadvisor stayed steady throughout: RSS 63–66 MB, 13–14 fds, scrape ≤ 9 ms, discovery ≤ 1.5 s, drain ~503 ms, and `trend` found no slowdown or growing residue. README "Tests on a node", presentation issue table, CLAUDE.md.
