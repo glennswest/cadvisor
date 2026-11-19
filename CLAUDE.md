@@ -44,6 +44,8 @@ enrichment. Seven crates under `crates/` — see README.md.
   sc-build-dac2685841 (check-stubs, build, test, clippy -D warnings, real
   binary refuses `-enable_metrics=cpu,tcp` and `-disable_metrics=bogus`). Gap
   filed as #40 (P3, proposed).
+  #39 (the same sweep, `cadvisor-model/src/lib.rs` doc comment) was fixed by
+  the same commit and closed with it.
 - 2026-11-13 — #12 test containers (short, medium, long) per stormcentral
   `docs/test-standard.md`, all passing on nodes. long: ad5d544d14 (777fc33,
   pvetest1) 456 pass / 0 fail / 1 skip over 454 waves, RSS 63–66 MB, 13–14
