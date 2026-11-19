@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### 2026-11-18
+- **chore:** #3 verified live and closed. On pvetest1 and pvetest2 (release 12.95, stormcos#391's `/hostrun` mount), `/api/v1.3/subcontainers/` labels every Running scheduled pod container the apiserver lists (10 of 10 on each node, none extra) with `io.kubernetes.pod.{namespace,name}` and `io.kubernetes.container.name`, and `/metrics` carries `container_label_io_kubernetes_pod_name`. The 38 mirror pods of stormd node services per node get no kubelet record, so they stay `id`-only. That is filed as rustkube-node#407. README and the presentation are updated.
+
 ### 2026-11-14
 - **docs:** refresh from the code since 2026-11-07: README `long` suite row (pause before each scrape, residue per wave) and the nested `/stormpump/pods/<qos>/w<tag>-<n>` cgroup path (#34), test status date, presentation issue table (#25, #34, #35), CLAUDE.md open issues. No docs promise anything the code lacks that is not already an issue.
 

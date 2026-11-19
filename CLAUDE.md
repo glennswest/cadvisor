@@ -179,6 +179,11 @@ enrichment. Seven crates under `crates/` — see README.md.
   workspace tests incl. 6 `review::tests` and `tests/review_auth.rs` (real
   binary vs a fake apiserver), clippy clean. Not on in the golden until
   stormcos#143 sets the argv, SA token and RBAC.
+- 2026-11-18 — #3 closed, verified live: on pvetest1 and pvetest2 (12.95,
+  stormcos#391's `/hostrun`), `/api/v1.3/subcontainers/` labels 10/10
+  Running scheduled pod containers from the apiserver's pod list, none
+  extra. The 38 stormd node-service mirror pods per node have no kubelet
+  record (rustkube-node#407 filed). No code change; no golden.
 - 2026-11-07 — #3 stormpump pod identity: `cadvisor-runtime/src/workload.rs`
   reads the kubelet's `/run/rustkube/workloads/<basename>.json`
   (rustkube-node#84, shipped in golden 0fc1a74fff24) as the first link of the
@@ -270,9 +275,8 @@ enrichment. Seven crates under `crates/` — see README.md.
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
   unless flags are set; the stormcos golden does not set them yet (stormcos#143: cert, token, https
   liveness; the anonymous route is already dropped).
-- #3 done in code; stormcos pods stay `id`-only on nodes until stormcos#391
-  (host `/run` → `/hostrun` in cadvisor's container). (CRI-O's `ContainerReference.namespace = "crio"` is
-  upstream's own value, not a gap.)
+- Mirror pods of stormd node services stay `id`-only until rustkube-node#407
+  (the kubelet writes no workload record for them).
 - #19 the test crate talks plain HTTP without a token (`test/src/cad.rs`);
   it needs https + a token once stormcos#143 turns TLS/auth on in the golden.
 - The version is still 0.1.0: the #14 fix is in golden cc73674e1ff2 without a
@@ -284,8 +288,6 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #34 P3 nested `/stormpump/pods/<qos>/w…` cgroups: docs now say so; no test yet.
 - #35 review auth on a joined worker (stormcos#143); #30 P3 fs counters on `/`;
   #36 P3 rustls 0.23.46 bump; #28/#23 are docs issues this pass answers.
-- #3 P1 pod metadata: workload-record client done (2026-11-07); live check
-  waits on stormcos#391.
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
 - #15 P2 per-VM stats: cadvisor side done; needs-owner (close, or keep for a
   guest-matched proof). Network: rustkube-node#88 / stormvm#16.

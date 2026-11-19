@@ -102,7 +102,7 @@ Seven crates: `cadvisor` (binary), `-model` (wire types), `-host`, `-runtime`,
   raw cgroups, not an error. Network stats come from the pod sandbox's
   `/proc/<pid>/net`. stormcos pods run under stormpump: their cgroups
   (`/stormpump/w<tag>-<n>`) are labelled from the kubelet's records in
-  `/run/rustkube/workloads/` (#3, rustkube-node#84; needs stormcos#391).
+  `/run/rustkube/workloads/` (#3, rustkube-node#84; live since 12.95).
 
 ---
 
@@ -200,7 +200,8 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
   cadvisor, its own SA token, the review argv and https liveness
   (stormcos#143). The code is in (#4, #27).
 - **Pod metadata on stormcos** — read from the kubelet's workload records
-  (#3, done); reaches nodes once stormcos#391 mounts the host's `/run`. Bare `pod`/`namespace` labels, beyond
+  (#3, done, live on nodes since 12.95; node-service mirror pods wait on
+  rustkube-node#407). Bare `pod`/`namespace` labels, beyond
   upstream, are an open decision (#16).
 - **A must-gather collector** in stormcos_qa (#5).
 - **Test suites over https with a token**, for when stormcos#143 lands (#19).
@@ -230,7 +231,7 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
 | #25 | API health probes (stormcentral#596) | P0; `stats` and `metrics` declared in code/README; registry `apis` not yet set by the master |
 | #34 | tests for nested `/stormpump/pods/<qos>/w…` cgroups | P3 |
 | #35 | review auth on a joined worker (stormcos#143) | open |
-| #3 | pod metadata | workload-record client done; live once stormcos#391 ships |
+| #3 | pod metadata | done: live on pvetest1/2 (12.95), 10/10 pod containers labelled; mirror pods → rustkube-node#407 |
 | #15 | per-VM stats keyed to the VMI | P2; identity and disk done; network needs rustkube-node#88 / stormvm#16 |
 | #19 | test suites need https + a token | P2; after stormcos#143 turns TLS/auth on in the golden (#4, done) |
 | #16 | decide: bare `pod`/`namespace` labels | P3; owner's call |

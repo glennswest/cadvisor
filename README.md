@@ -55,9 +55,11 @@ A slide deck on its purpose and functionality is in
   cgroup that appears before its record is re-checked on every housekeeping
   tick for 30s, then once a minute. The directory is
   `-workload_identity_dir`, by default `/run/rustkube/workloads` and then
-  `/hostrun/rustkube/workloads` (cadvisor's stormcos container, once
-  stormcos#391 mounts the host's `/run` there). Until then stormcos pods stay
-  raw cgroups with only `id`.
+  `/hostrun/rustkube/workloads` (cadvisor's stormcos container: stormcos#391
+  mounts the host's `/run` there). Live on nodes since release 12.95: every
+  scheduled pod's container under `/stormpump/pods/<qos>/w…` is labelled.
+  The mirror pods of stormd node services (top-level `/stormpump/w…`) get
+  no record from the kubelet yet, so they stay `id`-only (rustkube-node#407).
 - **VMs** (#15): a VMI's hypervisor is a stormpump workload with its own
   cgroup and a `kind: vm` record. So it is reported as its own container
   with the VMI's namespace and name in `io.kubernetes.pod.{namespace,name}`
