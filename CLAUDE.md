@@ -269,7 +269,12 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- (none)
+- 2026-11-19 — #38 stub sweep: README's "Not implemented" line. Plan:
+  `-enable_metrics` accepts only the groups that emit families (cpu, cpuLoad,
+  memory, disk, diskIO, network, oom_event); `-disable_metrics` accepts any
+  upstream group name (off is true); unknown names refused at startup, as
+  upstream. Drop the README/model-doc lines; file the unbuilt groups and
+  protobuf exposition as a `gap` issue.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
