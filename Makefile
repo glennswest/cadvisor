@@ -11,6 +11,7 @@ CADVISOR_IMG ?= gcr.io/cadvisor/cadvisor:v0.49.2
 .PHONY: test conformance package
 
 test:
+	deploy/check-stubs.sh
 	cargo test
 
 # Structural diff of a real cadvisor ($(CADVISOR_IMG)) against cadvisor-rs,

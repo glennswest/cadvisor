@@ -246,6 +246,8 @@ fn main() -> anyhow::Result<()> {
     let auth = (tokens.is_some() || reviewer.is_some())
         .then(|| std::sync::Arc::new(secure::Auth { tokens, reviewer }));
 
+    let disabled_groups = disabled_groups(&args.disable_metrics, &args.enable_metrics)?;
+
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
@@ -255,24 +257,6 @@ fn main() -> anyhow::Result<()> {
             manager.start().await.context("start manager")?;
             tracing::info!(version = CADVISOR_VERSION, "cadvisor-rs started");
 
-            // Upstream metric-group flags: enable overrides disable when set.
-            let all_default_enabled = ["cpu", "percpu", "memory", "cpuLoad", "disk", "diskIO", "network", "app", "perf_event", "oom_event", "pressure"];
-            let disabled_groups: std::collections::BTreeSet<String> =
-                if args.enable_metrics.is_empty() {
-                    args.disable_metrics
-                        .split(',')
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect()
-                } else {
-                    let enabled: Vec<&str> =
-                        args.enable_metrics.split(',').map(str::trim).collect();
-                    all_default_enabled
-                        .iter()
-                        .filter(|g| !enabled.contains(*g))
-                        .map(|g| g.to_string())
-                        .collect()
-                };
             let metrics_opts = cadvisor_metrics::MetricsOpts {
                 store_container_labels: args.store_container_labels,
                 whitelisted_container_labels: args
@@ -322,6 +306,59 @@ fn main() -> anyhow::Result<()> {
 fn main() {
     eprintln!("cadvisor-rs {CADVISOR_VERSION}: Linux only (cgroup v2 required)");
     std::process::exit(1);
+}
+
+/// Every metric group name upstream v0.49.2 knows (`container.AllMetrics`).
+/// Any other name is refused, as upstream refuses it.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+const UPSTREAM_GROUPS: [&str; 22] = [
+    "cpu", "sched", "percpu", "memory", "memory_numa", "cpuLoad", "diskIO", "disk", "network",
+    "tcp", "advtcp", "udp", "app", "process", "hugetlb", "perf_event", "referenced_memory",
+    "cpu_topology", "resctrl", "cpuset", "oom_event", "pressure",
+];
+
+/// The groups whose families `/metrics` renders. Only these can be enabled.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+const BUILT_GROUPS: [&str; 7] = ["cpu", "cpuLoad", "memory", "disk", "diskIO", "network", "oom_event"];
+
+/// The set of built groups to leave out of `/metrics`, from upstream's
+/// `-disable_metrics` / `-enable_metrics` (enable overrides disable when set).
+/// Disabling any upstream group is accepted (one cadvisor-rs does not build is
+/// off already); enabling one it does not build is refused, so a flag never
+/// asks for families that would not appear.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn disabled_groups(disable: &str, enable: &str) -> anyhow::Result<std::collections::BTreeSet<String>> {
+    let names = |list: &str| -> Vec<String> {
+        list.split(',').map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect()
+    };
+    let known = |flag: &str, name: &str| -> anyhow::Result<()> {
+        if UPSTREAM_GROUPS.contains(&name) {
+            Ok(())
+        } else {
+            anyhow::bail!("-{flag}: unsupported metric {name:?} specified")
+        }
+    };
+    if enable.trim().is_empty() {
+        let mut out = std::collections::BTreeSet::new();
+        for g in names(disable) {
+            known("disable_metrics", &g)?;
+            if BUILT_GROUPS.contains(&g.as_str()) {
+                out.insert(g);
+            }
+        }
+        return Ok(out);
+    }
+    let enabled = names(enable);
+    for g in &enabled {
+        known("enable_metrics", g)?;
+        if !BUILT_GROUPS.contains(&g.as_str()) {
+            anyhow::bail!(
+                "-enable_metrics: cadvisor-rs has no {g:?} metric group; it can enable {}",
+                BUILT_GROUPS.join(", ")
+            );
+        }
+    }
+    Ok(BUILT_GROUPS.iter().filter(|g| !enabled.iter().any(|e| e == *g)).map(|g| g.to_string()).collect())
 }
 
 #[cfg(test)]
@@ -404,5 +441,28 @@ mod tests {
         assert_eq!(a.containerd_namespace, "k8s.io");
         assert_eq!(a.update_machine_info_interval, "5m0s");
         assert!(a.store_container_labels && a.allow_dynamic_housekeeping);
+    }
+
+    #[test]
+    fn metric_groups_disable_and_enable() {
+        let set = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(disabled_groups("", "").unwrap(), set(&[]));
+        // Upstream's own default disable list: the unbuilt groups are off already.
+        let d = disabled_groups("advtcp,cpu_topology,cpuset,hugetlb,memory_numa,percpu,process,referenced_memory,resctrl,sched,tcp,udp,disk", "").unwrap();
+        assert_eq!(d, set(&["disk"]));
+        let d = disabled_groups("percpu", "cpu, memory").unwrap();
+        assert_eq!(d, set(&["cpuLoad", "disk", "diskIO", "network", "oom_event"]));
+    }
+
+    #[test]
+    fn metric_groups_refuse_unknown_and_unbuilt() {
+        let e = disabled_groups("cpu,bogus", "").unwrap_err().to_string();
+        assert!(e.contains("\"bogus\""), "{e}");
+        let e = disabled_groups("", "cpu,nope").unwrap_err().to_string();
+        assert!(e.contains("\"nope\""), "{e}");
+        for g in ["tcp", "udp", "advtcp", "sched", "hugetlb", "perf_event", "resctrl", "percpu", "app", "pressure", "process"] {
+            let e = disabled_groups("", &format!("cpu,{g}")).unwrap_err().to_string();
+            assert!(e.contains("has no") && e.contains(g), "{e}");
+        }
     }
 }

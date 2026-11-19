@@ -269,7 +269,7 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- 2026-11-19 — #38 stub sweep: README's "Not implemented" line. Plan:
+- 2026-11-19 — #38 stub sweep: README's line on unbuilt metric groups and protobuf. Plan:
   `-enable_metrics` accepts only the groups that emit families (cpu, cpuLoad,
   memory, disk, diskIO, network, oom_event); `-disable_metrics` accepts any
   upstream group name (off is true); unknown names refused at startup, as

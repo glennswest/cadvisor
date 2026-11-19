@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### 2026-11-19
+- **fix:** metric-group flags no longer accept groups that render nothing (#38, stub sweep). `-enable_metrics` takes only the groups `/metrics` renders (`cpu`, `cpuLoad`, `memory`, `disk`, `diskIO`, `network`, `oom_event`). `-disable_metrics` takes any upstream v0.49.2 group name, because a group cadvisor-rs does not render is off already. A name upstream does not know is refused by both flags, as upstream refuses it. Both are checked at startup. Before this, `-enable_metrics=tcp` was accepted and emitted nothing. Tests: `metric_groups_disable_and_enable`, `metric_groups_refuse_unknown_and_unbuilt`.
+- **docs:** The README line on unbuilt groups and protobuf is gone. The metric-group rules are under Flags; the presentation and the module docs are updated too. The unbuilt groups and protobuf exposition are filed as a `gap` issue.
+- **chore:** `deploy/check-stubs.sh` (copied from stormcentral, #1455) runs in `make test`; README lists it under sc-build.
+
 ### 2026-11-18
 - **chore:** #3 verified live and closed. On pvetest1 and pvetest2 (release 12.95, stormcos#391's `/hostrun` mount), `/api/v1.3/subcontainers/` labels every Running scheduled pod container the apiserver lists (10 of 10 on each node, none extra) with `io.kubernetes.pod.{namespace,name}` and `io.kubernetes.container.name`, and `/metrics` carries `container_label_io_kubernetes_pod_name`. The 38 mirror pods of stormd node services per node get no kubelet record, so they stay `id`-only. That is filed as rustkube-node#407. README and the presentation are updated.
 

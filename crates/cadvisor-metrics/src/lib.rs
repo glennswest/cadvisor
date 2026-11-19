@@ -3,9 +3,9 @@
 //! formatting, per-sample timestamps).
 //!
 //! No metrics-registry crate: one pass over the manager's containers renders
-//! straight into a reused buffer. Families for default-disabled upstream
-//! metric groups (tcp/udp/advtcp, sched, hugetlb, perf, resctrl, ...) accept
-//! their flag tokens but emit nothing, matching a default cadvisor build.
+//! straight into a reused buffer. The metric groups rendered are cpu, cpuLoad,
+//! memory, disk, diskIO, network and oom_event; the binary refuses
+//! `-enable_metrics` for any other group (#38).
 
 pub mod encode;
 pub mod families;

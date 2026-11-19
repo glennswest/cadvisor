@@ -90,10 +90,9 @@ A slide deck on its purpose and functionality is in
   containerd's OCI spec (`process.env`). CRI-O containers get none, because
   CRI-O's inspect API has no environment; upstream collects it only for
   containerd and docker too. stormpump records carry no environment.
-- **Not implemented:** protobuf responses, and upstream's
-  default-disabled metric groups (tcp/udp/advtcp, sched, hugetlb, perf,
-  resctrl, …). The names of those groups are accepted in the flags and emit
-  nothing, which is what a default upstream build does.
+- **Metric groups (#38).** `/metrics` renders the groups `cpu`, `cpuLoad`,
+  `memory`, `disk`, `diskIO`, `network` and `oom_event`. Those are the only
+  names `-enable_metrics` takes. See [Flags](#flags) for the rules.
 
 ## Endpoints
 
@@ -147,8 +146,8 @@ mean `true`, as in Go.
 | `-global_housekeeping_interval` | `1m0s` | Full cgroup-tree rediscovery sweep |
 | `-storage_duration` | `2m0s` | How long samples stay in the in-memory ring buffer |
 | `-update_machine_info_interval` | `5m0s` | How often machine info (disk map, filesystems, NICs, memory) is re-read |
-| `-disable_metrics` | `""` | Comma-separated metric groups to leave out of `/metrics` |
-| `-enable_metrics` | `""` | If set, only these groups are emitted. It overrides `-disable_metrics`. |
+| `-disable_metrics` | `""` | Comma-separated metric groups to leave out of `/metrics`. Any upstream group name is taken. |
+| `-enable_metrics` | `""` | If set, only these groups are emitted. It overrides `-disable_metrics`. Only the seven groups cadvisor-rs renders are taken. |
 | `-store_container_labels` | `true` | Export every runtime label as a `container_label_*` Prometheus label |
 | `-whitelisted_container_labels` | `""` | Labels to export when `-store_container_labels=false` |
 | `-env_metadata_whitelist` | `""` | Comma-separated env var key prefixes exported as `envs` / `container_env_*` (containerd only, as upstream) |
@@ -171,10 +170,22 @@ These metric group names change the output: `cpu`, `cpuLoad`
 `container_blkio_*` families), `network` and `oom_event`
 (`container_oom_events_total`). The cpu and memory spec
 families follow their group. `cadvisor_version_info`, `container_start_time_seconds`,
-`container_last_seen` and the `machine_*` families are always emitted. The groups `percpu`, `app`, `perf_event` and
-`pressure` are in the `--enable-metrics` universe too and emit nothing. When
-`--enable-metrics` is set, every group in that list that you do not name is
+`container_last_seen` and the `machine_*` families are always emitted. When
+`-enable_metrics` is set, each of those seven groups it does not name is
 disabled.
+
+The flags are checked at startup, and a bad name stops cadvisor with an error:
+- A name upstream v0.49.2 does not know is refused by both flags, as upstream
+  refuses it.
+- `-disable_metrics` takes the rest of upstream's names too (`tcp`, `udp`,
+  `advtcp`, `sched`, `percpu`, `hugetlb`, `perf_event`, `resctrl`, `process`,
+  `app`, `pressure`, `cpuset`, `cpu_topology`, `memory_numa`,
+  `referenced_memory`). cadvisor-rs renders none of those groups, so they are
+  off whether named or not. Upstream's default disable list therefore works
+  unchanged.
+- `-enable_metrics` refuses those names. A group cadvisor-rs does not render
+  cannot be turned on, so the flag never asks for families that would not
+  appear.
 
 Two machine families are not in v0.49.2 (#29, stormcos#637). Each has one
 series per device in machine info's `network_devices`: every interface except
@@ -348,6 +359,7 @@ commit in a scratch directory and then deletes it:
 sc-build                                          # cargo build && cargo test
 sc-build 'cargo test -p cadvisor-metrics'         # any command
 sc-build 'cargo run -p cadvisor-host --example dump machine'
+sc-build deploy/check-stubs.sh                    # no stub markers (stormcentral#1455)
 ```
 
 The test container's crate (`test/`) is its own cargo workspace, so the

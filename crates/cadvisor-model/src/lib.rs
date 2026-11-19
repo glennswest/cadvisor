@@ -21,8 +21,8 @@
 //! - `time.Time` → [`GoTime`]: RFC3339 with trailing-zero-trimmed nanoseconds,
 //!   zero value `"0001-01-01T00:00:00Z"`.
 //!
-//! Not implemented (deferred): protobuf forms; the deprecated v1 `accelerators`
-//! collectors never populate data, but the wire fields exist.
+//! JSON only. The deprecated v1 `accelerators` field is on the wire, as in
+//! upstream's types, and cadvisor-rs always serves it empty.
 
 #[cfg(test)]
 mod golden;

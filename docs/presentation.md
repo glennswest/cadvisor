@@ -111,7 +111,8 @@ Seven crates: `cadvisor` (binary), `-model` (wire types), `-host`, `-runtime`,
 - **`/metrics`**: Prometheus text 0.0.4, byte-compatible with v0.49.2 at default
   flags — family names, HELP/TYPE, label sets, Go float formatting, per-sample
   timestamps. `--disable-metrics` / `--enable-metrics` select groups `cpu`,
-  `cpuLoad`, `memory`, `disk`, `diskIO`, `network`. A repeated series is
+  `cpuLoad`, `memory`, `disk`, `diskIO`, `network`, `oom_event`; enabling any
+  other group is refused at startup (#38). A repeated series is
   served once, first wins, as client_golang does (#14).
 - **REST**: `/api/v1.0`–`v1.3` (machine, containers, subcontainers, docker,
   events with the upstream query parameters and `stream=true`) and
