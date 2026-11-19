@@ -37,6 +37,13 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-11-19 — #38 stub sweep (README line on unbuilt metric groups and
+  protobuf). `-enable_metrics` takes only the 7 rendered groups;
+  `-disable_metrics` takes any upstream name; unknown names refused at startup
+  (3927b4c). `deploy/check-stubs.sh` added, run by `make test`. Verified:
+  sc-build-dac2685841 (check-stubs, build, test, clippy -D warnings, real
+  binary refuses `-enable_metrics=cpu,tcp` and `-disable_metrics=bogus`). Gap
+  filed as #40 (P3, proposed).
 - 2026-11-13 — #12 test containers (short, medium, long) per stormcentral
   `docs/test-standard.md`, all passing on nodes. long: ad5d544d14 (777fc33,
   pvetest1) 456 pass / 0 fail / 1 skip over 454 waves, RSS 63–66 MB, 13–14
@@ -269,12 +276,7 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- 2026-11-19 — #38 stub sweep: README's line on unbuilt metric groups and protobuf. Plan:
-  `-enable_metrics` accepts only the groups that emit families (cpu, cpuLoad,
-  memory, disk, diskIO, network, oom_event); `-disable_metrics` accepts any
-  upstream group name (off is true); unknown names refused at startup, as
-  upstream. Drop the README/model-doc lines; file the unbuilt groups and
-  protobuf exposition as a `gap` issue.
+- (none)
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
@@ -297,5 +299,6 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #15 P2 per-VM stats: cadvisor side done; needs-owner (close, or keep for a
   guest-matched proof). Network: rustkube-node#88 / stormvm#16.
 - #19 P2 test suites need https + token (proposed after stormcos#143).
+- #40 P3 gap: optional upstream metric groups and protobuf exposition.
 - #22 P3 v0.49.2 conformance diff not re-run since 2026-07-16 (nothing runs it).
 
