@@ -297,7 +297,7 @@ enrichment. Seven crates under `crates/` — see README.md.
   `de041f31067b` containerd reconnect (success cached only), NotFound
   retried, raw runtime handles re-enriched by housekeeping. Tests in
   `manager::refresh_tests` (fake CRI-O socket). Root `has_filesystem` is
-  forced false by add_container (pre-existing; to file).
+  forced false by add_container (pre-existing; filed as #43).
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off

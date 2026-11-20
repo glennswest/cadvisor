@@ -665,7 +665,7 @@ impl Manager {
             None => self.runtime_meta(basename, 3).await,
         };
         // Unchanged from before #42: has_filesystem only with a writable
-        // layer (apply_meta sets it), even for `/` (filed separately).
+        // layer (apply_meta sets it), even for `/` (#43).
         spec.has_filesystem = false;
         let handle = Arc::new(ContainerHandle::new(name, spec, self.cfg.storage_duration));
         match meta {
