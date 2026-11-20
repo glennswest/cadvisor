@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### 2026-11-20
+- **fix:** `families::family` moved above its test module (clippy `items_after_test_module`, #41).
 - **feat:** optional metric groups `tcp`, `udp`, `sched` and `hugetlb` (#40; the owner asked for them in ironprom and the console). `container_network_{tcp,tcp6}_usage_total` by `tcp_state` and `container_network_{udp,udp6}_usage_total` by `udp_state` from `/proc/<pid>/net/*`; `container_cpu_schedstat_*` from `/proc/<pid>/schedstat` over the cgroup tree, keeping the time of exited processes; `container_hugetlb_*` by `pagesize` from `hugetlb.<size>.{current,events}`. Each is read only while its group is on. `-disable_metrics` now defaults to upstream v0.49.2's list, so they are off unless enabled, and a `-disable_metrics` list replaces the default, as upstream.
 - **feat:** `percpu` is a group: on (the default) `cpu="total"` appears once usage is above 0; off, for every container from the first sample, as upstream. cgroup v2 has no per-CPU usage, so there is no `cpu="cpuNN"` series either way.
 - **feat:** `/metrics` serves delimited `io.prometheus.client.MetricFamily` protobuf when `Accept` prefers it (Prometheus and ironprom ask for it first), with expfmt's `Content-Type`. Text is unchanged.

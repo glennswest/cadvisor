@@ -289,6 +289,10 @@ enrichment. Seven crates under `crates/` — see README.md.
   /metrics by `Accept`. Also the missing cfs/quota families (rendered but
   never in FAMILIES). Then: golden argv `--enable_metrics …` by note to the
   master; ironprom and stormconsole pieces are filed by the master.
+  Code 5440fb4 + docs 4a44d8a. sc-build-cf3876d761: every test passed (incl.
+  `tests/optional_groups.rs` against the real binary), clippy failed on
+  items_after_test_module (filed as #41); fixed in 30ad25d. Next: sc-build on
+  30ad25d (queued, line ~60 deep), then image, argv note, comment, shipped.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
