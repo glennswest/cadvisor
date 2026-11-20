@@ -37,6 +37,17 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-11-20 — #40 optional groups `tcp`, `udp`, `sched`, `hugetlb`, `percpu`
+  (owner: "We need the metrics") + delimited protobuf on /metrics by `Accept`;
+  `-disable_metrics` default = upstream's list; cfs/quota HELP lines. cgroup v2
+  has no per-CPU usage (cpu="total" only). Verified: sc-build-faadcbebed on
+  30ad25d, 138 tests incl. `tests/optional_groups.rs` (real binary: off by
+  default, root tcp listen >= 1, schedstat > 0, protobuf = text families),
+  clippy clean (#41 was the clippy lint, closed by that run). Golden
+  73c62c5d231f requested. Golden argv `--enable_metrics …` sent to the master
+  (note + `wait-owner --action`: edit, then `component build cadvisor
+  --force`). Next, once done: `shipped` with proof
+  `get:http://{node}:9096/metrics ~ container_network_tcp_usage_total`.
 - 2026-11-19 — #38 stub sweep (README line on unbuilt metric groups and
   protobuf). `-enable_metrics` takes only the 7 rendered groups;
   `-disable_metrics` takes any upstream name; unknown names refused at startup
@@ -281,18 +292,7 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- 2026-11-20 — #40 owner reversed the defer ("We need the metrics. Want them
-  integrated into ironprom and graphs in our ui"). Building: groups `tcp`,
-  `udp`, `sched`, `hugetlb` (collected only when enabled, as upstream),
-  `percpu` gated (cgroup v2 has no per-CPU source: cpu="total" only),
-  `-disable_metrics` default = upstream's list, and delimited protobuf on
-  /metrics by `Accept`. Also the missing cfs/quota families (rendered but
-  never in FAMILIES). Then: golden argv `--enable_metrics …` by note to the
-  master; ironprom and stormconsole pieces are filed by the master.
-  Code 5440fb4 + docs 4a44d8a. sc-build-cf3876d761: every test passed (incl.
-  `tests/optional_groups.rs` against the real binary), clippy failed on
-  items_after_test_module (filed as #41); fixed in 30ad25d. Next: sc-build on
-  30ad25d (queued, line ~60 deep), then image, argv note, comment, shipped.
+- (none)
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
@@ -315,10 +315,7 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #15 P2 per-VM stats: cadvisor side done; needs-owner (close, or keep for a
   guest-matched proof). Network: rustkube-node#88 / stormvm#16.
 - #19 P2 test suites need https + token (proposed after stormcos#143).
-- #40 P3 gap: optional upstream metric groups and protobuf exposition.
-  2026-11-20: no consumer reads any of them (searched every `~/src` checkout;
-  ironprom asks for protobuf but takes text 0.0.4). Asked the owner A (none
-  until asked, recommended) / B (9 cgroup-v2 groups + protobuf) / C (all);
-  `wait-owner` on #40. No code change.
+- #40 P2 built (sc-build-faadcbebed); waiting on the golden argv edit + forced
+  build (wait-owner --action), then shipped with a /metrics proof.
 - #22 P3 v0.49.2 conformance diff not re-run since 2026-07-16 (nothing runs it).
 
