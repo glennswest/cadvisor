@@ -305,5 +305,9 @@ enrichment. Seven crates under `crates/` — see README.md.
   guest-matched proof). Network: rustkube-node#88 / stormvm#16.
 - #19 P2 test suites need https + token (proposed after stormcos#143).
 - #40 P3 gap: optional upstream metric groups and protobuf exposition.
+  2026-11-20: no consumer reads any of them (searched every `~/src` checkout;
+  ironprom asks for protobuf but takes text 0.0.4). Asked the owner A (none
+  until asked, recommended) / B (9 cgroup-v2 groups + protobuf) / C (all);
+  `wait-owner` on #40. No code change.
 - #22 P3 v0.49.2 conformance diff not re-run since 2026-07-16 (nothing runs it).
 
