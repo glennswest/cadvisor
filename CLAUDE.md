@@ -281,7 +281,14 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- (none)
+- 2026-11-20 — #40 owner reversed the defer ("We need the metrics. Want them
+  integrated into ironprom and graphs in our ui"). Building: groups `tcp`,
+  `udp`, `sched`, `hugetlb` (collected only when enabled, as upstream),
+  `percpu` gated (cgroup v2 has no per-CPU source: cpu="total" only),
+  `-disable_metrics` default = upstream's list, and delimited protobuf on
+  /metrics by `Accept`. Also the missing cfs/quota families (rendered but
+  never in FAMILIES). Then: golden argv `--enable_metrics …` by note to the
+  master; ironprom and stormconsole pieces are filed by the master.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
