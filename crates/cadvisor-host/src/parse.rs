@@ -208,6 +208,21 @@ pub fn parse_udp_stats(content: &str) -> UdpStat {
     out
 }
 
+/// `/proc/<pid>/schedstat`: `run_time runqueue_time run_periods` (ns, ns,
+/// count). Upstream refuses a line without exactly three fields.
+pub fn parse_schedstat(content: &str) -> Option<(u64, u64, u64)> {
+    let f: Vec<&str> = content.split_whitespace().collect();
+    if f.len() != 3 {
+        return None;
+    }
+    Some((f[0].parse().ok()?, f[1].parse().ok()?, f[2].parse().ok()?))
+}
+
+/// `hugetlb.<size>.events`: the `max` count (upstream's failcnt on v2).
+pub fn parse_hugetlb_events_max(content: &str) -> u64 {
+    flat_keyed(content).find(|(k, _)| *k == "max").map_or(0, |(_, v)| u64_field(v.trim()))
+}
+
 /// `/proc/meminfo` totals, in bytes.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct MemInfo {
@@ -448,6 +463,19 @@ mod tests {
         assert_eq!(udp.tx_queued, 0x10);
         assert_eq!(udp.rx_queued, 0x20);
         assert_eq!(udp.dropped, 5);
+    }
+
+    #[test]
+    fn schedstat_line() {
+        assert_eq!(parse_schedstat("123456 7890 42\n"), Some((123456, 7890, 42)));
+        assert_eq!(parse_schedstat("1 2\n"), None);
+        assert_eq!(parse_schedstat("1 x 3\n"), None);
+    }
+
+    #[test]
+    fn hugetlb_events_max() {
+        assert_eq!(parse_hugetlb_events_max("max 7\n"), 7);
+        assert_eq!(parse_hugetlb_events_max(""), 0);
     }
 
     #[test]

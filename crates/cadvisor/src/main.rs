@@ -17,6 +17,10 @@ mod review;
 
 pub const CADVISOR_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Upstream v0.49.2's `-disable_metrics` default (`ignoreMetrics`).
+const DEFAULT_DISABLED: &str =
+    "advtcp,cpu_topology,cpuset,hugetlb,memory_numa,process,referenced_memory,resctrl,sched,tcp,udp";
+
 #[derive(Parser, Debug, Clone)]
 #[command(name = "cadvisor", version, about = "cAdvisor-compatible container monitoring daemon")]
 pub struct Args {
@@ -52,8 +56,9 @@ pub struct Args {
     #[arg(long = "storage_duration", alias = "storage-duration", default_value = "2m0s")]
     pub storage_duration: String,
 
-    /// Comma-separated list of metric groups to disable
-    #[arg(long = "disable_metrics", alias = "disable-metrics", default_value = "")]
+    /// Comma-separated list of metric groups to disable (replaces the
+    /// default list, as upstream)
+    #[arg(long = "disable_metrics", alias = "disable-metrics", default_value = DEFAULT_DISABLED)]
     pub disable_metrics: String,
 
     /// Comma-separated list of metric groups to enable (overrides disable)
@@ -247,6 +252,7 @@ fn main() -> anyhow::Result<()> {
         .then(|| std::sync::Arc::new(secure::Auth { tokens, reviewer }));
 
     let disabled_groups = disabled_groups(&args.disable_metrics, &args.enable_metrics)?;
+    let cfg = cadvisor_manager::ManagerConfig { collect: collect(&disabled_groups), ..cfg };
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -319,7 +325,17 @@ const UPSTREAM_GROUPS: [&str; 22] = [
 
 /// The groups whose families `/metrics` renders. Only these can be enabled.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
-const BUILT_GROUPS: [&str; 7] = ["cpu", "cpuLoad", "memory", "disk", "diskIO", "network", "oom_event"];
+const BUILT_GROUPS: [&str; 12] = [
+    "cpu", "cpuLoad", "memory", "disk", "diskIO", "network", "oom_event", "percpu", "sched", "tcp", "udp",
+    "hugetlb",
+];
+
+/// The optional stats housekeeping reads, from the groups left on (#40).
+#[cfg(target_os = "linux")]
+fn collect(disabled: &std::collections::BTreeSet<String>) -> cadvisor_manager::Collect {
+    let on = |g: &str| !disabled.contains(g);
+    cadvisor_manager::Collect { tcp: on("tcp"), udp: on("udp"), sched: on("sched"), hugetlb: on("hugetlb") }
+}
 
 /// The set of built groups to leave out of `/metrics`, from upstream's
 /// `-disable_metrics` / `-enable_metrics` (enable overrides disable when set).
@@ -447,11 +463,36 @@ mod tests {
     fn metric_groups_disable_and_enable() {
         let set = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<std::collections::BTreeSet<_>>();
         assert_eq!(disabled_groups("", "").unwrap(), set(&[]));
-        // Upstream's own default disable list: the unbuilt groups are off already.
-        let d = disabled_groups("advtcp,cpu_topology,cpuset,hugetlb,memory_numa,percpu,process,referenced_memory,resctrl,sched,tcp,udp,disk", "").unwrap();
+        // Upstream's default: the optional groups built here are off.
+        let d = disabled_groups(DEFAULT_DISABLED, "").unwrap();
+        assert_eq!(d, set(&["hugetlb", "sched", "tcp", "udp"]));
+        assert_eq!(parse(&[]).disable_metrics, DEFAULT_DISABLED);
+        // A -disable_metrics list replaces the default, as upstream.
+        let d = disabled_groups("disk", "").unwrap();
         assert_eq!(d, set(&["disk"]));
         let d = disabled_groups("percpu", "cpu, memory").unwrap();
-        assert_eq!(d, set(&["cpuLoad", "disk", "diskIO", "network", "oom_event"]));
+        assert_eq!(
+            d,
+            set(&["cpuLoad", "disk", "diskIO", "hugetlb", "network", "oom_event", "percpu", "sched", "tcp", "udp"])
+        );
+        // The golden's list (#40): the defaults plus the four optional groups.
+        let d = disabled_groups(
+            DEFAULT_DISABLED,
+            "cpu,cpuLoad,memory,disk,diskIO,network,oom_event,percpu,sched,tcp,udp,hugetlb",
+        )
+        .unwrap();
+        assert_eq!(d, set(&[]));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn optional_groups_drive_collection() {
+        let off = disabled_groups(DEFAULT_DISABLED, "").unwrap();
+        assert_eq!(collect(&off), cadvisor_manager::Collect::default());
+        let on = disabled_groups("disk", "").unwrap();
+        assert_eq!(collect(&on), cadvisor_manager::Collect { tcp: true, udp: true, sched: true, hugetlb: true });
+        let some = disabled_groups("", "cpu,tcp,hugetlb").unwrap();
+        assert_eq!(collect(&some), cadvisor_manager::Collect { tcp: true, udp: false, sched: false, hugetlb: true });
     }
 
     #[test]
@@ -460,7 +501,7 @@ mod tests {
         assert!(e.contains("\"bogus\""), "{e}");
         let e = disabled_groups("", "cpu,nope").unwrap_err().to_string();
         assert!(e.contains("\"nope\""), "{e}");
-        for g in ["tcp", "udp", "advtcp", "sched", "hugetlb", "perf_event", "resctrl", "percpu", "app", "pressure", "process"] {
+        for g in ["advtcp", "perf_event", "resctrl", "app", "pressure", "process", "memory_numa", "cpuset"] {
             let e = disabled_groups("", &format!("cpu,{g}")).unwrap_err().to_string();
             assert!(e.contains("has no") && e.contains(g), "{e}");
         }

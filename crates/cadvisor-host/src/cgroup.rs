@@ -4,6 +4,7 @@
 //! semantics (see crate docs). All reads are relative to a cgroup path like
 //! `/machine.slice/libpod-<id>.scope` under the unified mountpoint.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
@@ -95,6 +96,54 @@ impl CgroupReader {
     pub fn procs(&self, cgroup: &str) -> Result<Vec<u32>, HostError> {
         let content = self.read(cgroup, "cgroup.procs")?;
         Ok(content.lines().filter_map(|l| l.trim().parse().ok()).collect())
+    }
+
+    /// PIDs in this cgroup and every cgroup below it (upstream's
+    /// `GetAllPids`). A cgroup removed mid-walk is skipped.
+    pub fn procs_recursive(&self, cgroup: &str) -> Result<Vec<u32>, HostError> {
+        let mut out = self.procs(cgroup)?;
+        let mut stack = Vec::new();
+        self.list_children(cgroup, &mut stack)?;
+        while let Some(c) = stack.pop() {
+            match self.procs(&c) {
+                Ok(p) => out.extend(p),
+                Err(e) if e.is_not_found() => continue,
+                Err(e) => return Err(e),
+            }
+            let _ = self.list_children(&c, &mut stack);
+        }
+        Ok(out)
+    }
+
+    /// Hugepage stats per page size from `hugetlb.<size>.current` and
+    /// `hugetlb.<size>.events` (`max` = failcnt), as runc's fs2 reads them.
+    /// cgroup v2 keeps no peak, so `max_usage` is 0 (as upstream). Empty when
+    /// the hugetlb controller is not enabled for this cgroup.
+    pub fn read_hugetlb(&self, cgroup: &str) -> Result<BTreeMap<String, v1::HugetlbStats>, HostError> {
+        let dir = self.dir(cgroup);
+        let mut out = BTreeMap::new();
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(out),
+            Err(e) => return Err(HostError::io(&dir, e)),
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let Some(size) = name
+                .to_str()
+                .and_then(|n| n.strip_prefix("hugetlb."))
+                .and_then(|n| n.strip_suffix(".current"))
+                .filter(|s| !s.contains('.'))
+            else {
+                continue;
+            };
+            let usage = self.read_u64_or_max(cgroup, &format!("hugetlb.{size}.current"))?.unwrap_or(0);
+            let failcnt = self
+                .read_opt(cgroup, &format!("hugetlb.{size}.events"))?
+                .map_or(0, |c| parse::parse_hugetlb_events_max(&c));
+            out.insert(size.to_string(), v1::HugetlbStats { usage, max_usage: 0, failcnt });
+        }
+        Ok(out)
     }
 
     pub fn read_spec(&self, cgroup: &str) -> Result<CgroupSpec, HostError> {
@@ -194,5 +243,50 @@ impl CgroupReader {
             }
         }
         Ok(s)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tree(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("cadvisor-cg-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("pod/c1")).unwrap();
+        std::fs::create_dir_all(dir.join("pod/c2")).unwrap();
+        dir
+    }
+
+    #[test]
+    fn procs_recursive_takes_every_descendant() {
+        let dir = tree("procs");
+        std::fs::write(dir.join("pod/cgroup.procs"), "").unwrap();
+        std::fs::write(dir.join("pod/c1/cgroup.procs"), "10\n11\n").unwrap();
+        std::fs::write(dir.join("pod/c2/cgroup.procs"), "20\n").unwrap();
+        let r = CgroupReader::new(&dir);
+        let mut pids = r.procs_recursive("/pod").unwrap();
+        pids.sort();
+        assert_eq!(pids, vec![10, 11, 20]);
+        assert_eq!(r.procs("/pod").unwrap(), Vec::<u32>::new());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn hugetlb_per_page_size() {
+        let dir = tree("huge");
+        let c = dir.join("pod/c1");
+        std::fs::write(c.join("hugetlb.2MB.current"), "4194304\n").unwrap();
+        std::fs::write(c.join("hugetlb.2MB.events"), "max 3\n").unwrap();
+        std::fs::write(c.join("hugetlb.2MB.max"), "max\n").unwrap();
+        std::fs::write(c.join("hugetlb.1GB.current"), "0\n").unwrap();
+        std::fs::write(c.join("hugetlb.1GB.events"), "max 0\n").unwrap();
+        std::fs::write(c.join("hugetlb.1GB.rsvd.current"), "0\n").unwrap();
+        let r = CgroupReader::new(&dir);
+        let h = r.read_hugetlb("/pod/c1").unwrap();
+        assert_eq!(h.keys().collect::<Vec<_>>(), ["1GB", "2MB"]);
+        assert_eq!(h["2MB"], v1::HugetlbStats { usage: 4194304, max_usage: 0, failcnt: 3 });
+        assert!(r.read_hugetlb("/pod/c2").unwrap().is_empty());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

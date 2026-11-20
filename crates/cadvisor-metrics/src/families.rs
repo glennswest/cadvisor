@@ -20,7 +20,13 @@ impl Kind {
 pub const FAMILIES: &[(&str, Kind, &str)] = &[
     ("cadvisor_version_info", Kind::Gauge, "A metric with a constant '1' value labeled by kernel version, OS version, docker version, cadvisor version & cadvisor revision."),
     ("container_blkio_device_usage_total", Kind::Counter, "Blkio Device bytes usage"),
+    ("container_cpu_cfs_periods_total", Kind::Counter, "Number of elapsed enforcement period intervals."),
+    ("container_cpu_cfs_throttled_periods_total", Kind::Counter, "Number of throttled period intervals."),
+    ("container_cpu_cfs_throttled_seconds_total", Kind::Counter, "Total time duration the container has been throttled."),
     ("container_cpu_load_average_10s", Kind::Gauge, "Value of container cpu load average over the last 10 seconds."),
+    ("container_cpu_schedstat_run_periods_total", Kind::Counter, "Number of times processes of the cgroup have run on the cpu"),
+    ("container_cpu_schedstat_run_seconds_total", Kind::Counter, "Time duration the processes of the container have run on the CPU."),
+    ("container_cpu_schedstat_runqueue_seconds_total", Kind::Counter, "Time duration processes of the container have been waiting on a runqueue."),
     ("container_cpu_system_seconds_total", Kind::Counter, "Cumulative system cpu time consumed in seconds."),
     ("container_cpu_usage_seconds_total", Kind::Counter, "Cumulative cpu time consumed in seconds."),
     ("container_cpu_user_seconds_total", Kind::Counter, "Cumulative user cpu time consumed in seconds."),
@@ -41,6 +47,9 @@ pub const FAMILIES: &[(&str, Kind, &str)] = &[
     ("container_fs_writes_bytes_total", Kind::Counter, "Cumulative count of bytes written"),
     ("container_fs_writes_merged_total", Kind::Counter, "Cumulative count of writes merged"),
     ("container_fs_writes_total", Kind::Counter, "Cumulative count of writes completed"),
+    ("container_hugetlb_failcnt", Kind::Counter, "Number of hugepage usages hits limits"),
+    ("container_hugetlb_max_usage_bytes", Kind::Gauge, "Maximum hugepage usages recorded"),
+    ("container_hugetlb_usage_bytes", Kind::Gauge, "Current hugepage usage in bytes"),
     ("container_last_seen", Kind::Gauge, "Last time a container was seen by the exporter"),
     ("container_memory_cache", Kind::Gauge, "Number of bytes of page cache memory."),
     ("container_memory_failcnt", Kind::Counter, "Number of memory usage hits limits"),
@@ -56,13 +65,18 @@ pub const FAMILIES: &[(&str, Kind, &str)] = &[
     ("container_network_receive_errors_total", Kind::Counter, "Cumulative count of errors encountered while receiving"),
     ("container_network_receive_packets_dropped_total", Kind::Counter, "Cumulative count of packets dropped while receiving"),
     ("container_network_receive_packets_total", Kind::Counter, "Cumulative count of packets received"),
+    ("container_network_tcp6_usage_total", Kind::Gauge, "tcp6 connection usage statistic for container"),
+    ("container_network_tcp_usage_total", Kind::Gauge, "tcp connection usage statistic for container"),
     ("container_network_transmit_bytes_total", Kind::Counter, "Cumulative count of bytes transmitted"),
     ("container_network_transmit_errors_total", Kind::Counter, "Cumulative count of errors encountered while transmitting"),
     ("container_network_transmit_packets_dropped_total", Kind::Counter, "Cumulative count of packets dropped while transmitting"),
     ("container_network_transmit_packets_total", Kind::Counter, "Cumulative count of packets transmitted"),
+    ("container_network_udp6_usage_total", Kind::Gauge, "udp6 connection usage statistic for container"),
+    ("container_network_udp_usage_total", Kind::Gauge, "udp connection usage statistic for container"),
     ("container_oom_events_total", Kind::Counter, "Count of out of memory events observed for the container"),
     ("container_scrape_error", Kind::Gauge, "1 if there was an error while getting container metrics, 0 otherwise"),
     ("container_spec_cpu_period", Kind::Gauge, "CPU period of the container."),
+    ("container_spec_cpu_quota", Kind::Gauge, "CPU quota of the container."),
     ("container_spec_cpu_shares", Kind::Gauge, "CPU share of the container."),
     ("container_spec_memory_limit_bytes", Kind::Gauge, "Memory limit for the container."),
     ("container_spec_memory_reservation_limit_bytes", Kind::Gauge, "Memory reservation limit for the container."),
@@ -81,6 +95,19 @@ pub const FAMILIES: &[(&str, Kind, &str)] = &[
     ("machine_scrape_error", Kind::Gauge, "1 if there was an error while getting machine metrics, 0 otherwise."),
     ("machine_swap_bytes", Kind::Gauge, "Amount of swap memory available on the machine."),
 ];
+
+#[cfg(test)]
+mod tests {
+    /// client_golang gathers families sorted by name; render walks this list.
+    #[test]
+    fn families_are_sorted_and_unique() {
+        let names: Vec<&str> = super::FAMILIES.iter().map(|f| f.0).collect();
+        let mut sorted = names.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(names, sorted);
+    }
+}
 
 pub fn family(name: &str) -> Option<&'static (&'static str, Kind, &'static str)> {
     FAMILIES.iter().find(|(n, _, _)| *n == name)

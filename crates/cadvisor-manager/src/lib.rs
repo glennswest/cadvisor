@@ -19,4 +19,4 @@ pub mod manager;
 pub use store::TimedStore;
 
 #[cfg(target_os = "linux")]
-pub use manager::{Manager, ManagerConfig, ManagerError};
+pub use manager::{Collect, Manager, ManagerConfig, ManagerError};

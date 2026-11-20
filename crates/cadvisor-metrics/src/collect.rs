@@ -42,6 +42,7 @@ fn clamp_unlimited(v: u64) -> f64 {
 }
 
 type Series = (Vec<(String, String)>, f64, Option<i64>);
+type Gathered = (&'static (&'static str, crate::families::Kind, &'static str), Vec<Series>);
 
 #[derive(Default)]
 struct Output {
@@ -53,9 +54,41 @@ impl Output {
         self.families.entry(family).or_default().push((labels, value, ts));
     }
 
-    fn render(mut self, buf: &mut String) {
-        for (name, kind, help) in FAMILIES {
-            let Some(mut series) = self.families.remove(name) else { continue };
+    /// Families in client_golang's order (by name), each family's series
+    /// sorted by label values, a repeated label set served once.
+    fn gathered(mut self) -> Vec<Gathered> {
+        let mut out = Vec::new();
+        for fam in FAMILIES {
+            let Some(mut series) = self.families.remove(fam.0) else { continue };
+            // client_golang orders series by label values.
+            series.sort_by(|a, b| a.0.cmp(&b.0));
+            // …and refuses a series "collected before with the same name and
+            // label values", serving the first (upstream's ContinueOnError).
+            // Two io.stat devices missing from the disk map both get
+            // device="" (#14). The sort is stable, so the first pushed stays.
+            series.dedup_by(|later, first| later.0 == first.0);
+            out.push((fam, series));
+        }
+        out
+    }
+
+    /// Delimited protobuf `MetricFamily`s (#40).
+    fn render_proto(self, buf: &mut Vec<u8>) {
+        for ((name, kind, help), series) in self.gathered() {
+            crate::proto::family(
+                buf,
+                name,
+                help,
+                *kind,
+                series.iter().map(|(labels, value, ts)| {
+                    (labels.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect(), *value, *ts)
+                }),
+            );
+        }
+    }
+
+    fn render(self, buf: &mut String) {
+        for ((name, kind, help), series) in self.gathered() {
             buf.push_str("# HELP ");
             buf.push_str(name);
             buf.push(' ');
@@ -65,13 +98,6 @@ impl Output {
             buf.push(' ');
             buf.push_str(kind.as_str());
             buf.push('\n');
-            // client_golang orders series by label values.
-            series.sort_by(|a, b| a.0.cmp(&b.0));
-            // …and refuses a series "collected before with the same name and
-            // label values", serving the first (upstream's ContinueOnError).
-            // Two io.stat devices missing from the disk map both get
-            // device="" (#14). The sort is stable, so the first pushed stays.
-            series.dedup_by(|later, first| later.0 == first.0);
             for (labels, value, ts) in series {
                 let label_refs: Vec<(&str, &str)> =
                     labels.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
@@ -151,7 +177,17 @@ impl ContainerLabels {
     }
 }
 
+/// The text exposition (0.0.4).
 pub fn render(manager: &Manager, opts: &MetricsOpts, buf: &mut String) {
+    gather(manager, opts).render(buf);
+}
+
+/// The delimited protobuf exposition (#40).
+pub fn render_proto(manager: &Manager, opts: &MetricsOpts, buf: &mut Vec<u8>) {
+    gather(manager, opts).render_proto(buf);
+}
+
+fn gather(manager: &Manager, opts: &MetricsOpts) -> Output {
     let mut out = Output::default();
     let now = GoTime::now();
     let now_ms = now.0.timestamp_millis();
@@ -235,8 +271,17 @@ pub fn render(manager: &Manager, opts: &MetricsOpts, buf: &mut String) {
                 s.cpu.usage.system as f64 / 1e9,
                 ts,
             );
-            if s.cpu.usage.per_cpu.is_empty() {
-                // Upstream only emits series for cpus with usage > 0.
+            if !enabled("percpu") {
+                // Without percpu upstream always emits the total, even at 0.
+                out.push(
+                    "container_cpu_usage_seconds_total",
+                    labels.with(&[("cpu", "total")]),
+                    s.cpu.usage.total as f64 / 1e9,
+                    ts,
+                );
+            } else if s.cpu.usage.per_cpu.is_empty() {
+                // cgroup v2 has no per-CPU usage: the total, and (as
+                // upstream) only once it is above 0.
                 if s.cpu.usage.total > 0 {
                     out.push(
                         "container_cpu_usage_seconds_total",
@@ -271,6 +316,27 @@ pub fn render(manager: &Manager, opts: &MetricsOpts, buf: &mut String) {
                     s.cpu.cfs.throttled_time as f64 / 1e9,
                     ts,
                 );
+            }
+        }
+
+        if enabled("sched") {
+            let sc = &s.cpu.schedstat;
+            out.push("container_cpu_schedstat_run_seconds_total", labels.with(&[]), sc.run_time as f64 / 1e9, ts);
+            out.push(
+                "container_cpu_schedstat_runqueue_seconds_total",
+                labels.with(&[]),
+                sc.runqueue_time as f64 / 1e9,
+                ts,
+            );
+            out.push("container_cpu_schedstat_run_periods_total", labels.with(&[]), sc.run_periods as f64, ts);
+        }
+
+        if enabled("hugetlb") {
+            for (size, h) in &s.hugetlb {
+                let l: &[(&str, &str)] = &[("pagesize", size)];
+                out.push("container_hugetlb_failcnt", labels.with(l), h.failcnt as f64, ts);
+                out.push("container_hugetlb_usage_bytes", labels.with(l), h.usage as f64, ts);
+                out.push("container_hugetlb_max_usage_bytes", labels.with(l), h.max_usage as f64, ts);
             }
         }
 
@@ -441,6 +507,13 @@ pub fn render(manager: &Manager, opts: &MetricsOpts, buf: &mut String) {
             }
         }
 
+        if enabled("tcp") {
+            tcp_metrics(&mut out, &labels, &s.network, ts);
+        }
+        if enabled("udp") {
+            udp_metrics(&mut out, &labels, &s.network, ts);
+        }
+
         if enabled("oom_event") {
             out.push("container_oom_events_total", labels.with(&[]), s.oom_events as f64, ts);
         }
@@ -479,8 +552,43 @@ pub fn render(manager: &Manager, opts: &MetricsOpts, buf: &mut String) {
     );
     nic_metrics(&mut out, &mi, mlabels(), mts);
     out.push("machine_scrape_error", vec![], 0.0, None);
+    out
+}
 
-    out.render(buf);
+/// `container_network_tcp{,6}_usage_total` by `tcp_state`, for every
+/// container (zeros where it has no network), as upstream.
+fn tcp_metrics(out: &mut Output, labels: &ContainerLabels, net: &v1::NetworkStats, ts: Option<i64>) {
+    for (family, t) in [("container_network_tcp_usage_total", &net.tcp), ("container_network_tcp6_usage_total", &net.tcp6)] {
+        for (state, v) in [
+            ("established", t.established),
+            ("synsent", t.syn_sent),
+            ("synrecv", t.syn_recv),
+            ("finwait1", t.fin_wait1),
+            ("finwait2", t.fin_wait2),
+            ("timewait", t.time_wait),
+            ("close", t.close),
+            ("closewait", t.close_wait),
+            ("lastack", t.last_ack),
+            ("listen", t.listen),
+            ("closing", t.closing),
+        ] {
+            out.push(family, labels.with(&[("tcp_state", state)]), v as f64, ts);
+        }
+    }
+}
+
+/// `container_network_udp{,6}_usage_total` by `udp_state`.
+fn udp_metrics(out: &mut Output, labels: &ContainerLabels, net: &v1::NetworkStats, ts: Option<i64>) {
+    for (family, u) in [("container_network_udp_usage_total", &net.udp), ("container_network_udp6_usage_total", &net.udp6)] {
+        for (state, v) in [
+            ("listen", u.listen),
+            ("dropped", u.dropped),
+            ("rxqueued", u.rx_queued),
+            ("txqueued", u.tx_queued),
+        ] {
+            out.push(family, labels.with(&[("udp_state", state)]), v as f64, ts);
+        }
+    }
 }
 
 /// One MTU and one speed gauge per device in machine info's
@@ -506,7 +614,18 @@ pub fn router(manager: Arc<Manager>, opts: MetricsOpts) -> axum::Router {
         .route(
             "/metrics",
             axum::routing::get(
-                |State(state): State<Arc<(Arc<Manager>, MetricsOpts)>>| async move {
+                |State(state): State<Arc<(Arc<Manager>, MetricsOpts)>>,
+                 headers: axum::http::HeaderMap| async move {
+                    let accept = headers
+                        .get(axum::http::header::ACCEPT)
+                        .and_then(|v| v.to_str().ok())
+                        .unwrap_or("");
+                    if crate::proto::wants_protobuf(accept) {
+                        let mut buf = Vec::with_capacity(256 * 1024);
+                        render_proto(&state.0, &state.1, &mut buf);
+                        return ([(axum::http::header::CONTENT_TYPE, crate::proto::CONTENT_TYPE)], buf)
+                            .into_response();
+                    }
                     let mut buf = String::with_capacity(256 * 1024);
                     render(&state.0, &state.1, &mut buf);
                     (
@@ -565,6 +684,71 @@ mod tests {
         ] {
             assert!(buf.lines().any(|l| l == line), "missing {line:?} in\n{buf}");
         }
+    }
+
+    fn base() -> ContainerLabels {
+        ContainerLabels { base: vec![("id".to_string(), "/c".to_string())] }
+    }
+
+    #[test]
+    fn tcp_and_udp_states() {
+        let mut net = v1::NetworkStats::default();
+        net.tcp.established = 3;
+        net.tcp.listen = 2;
+        net.tcp6.listen = 1;
+        net.udp.listen = 4;
+        net.udp6.dropped = 7;
+        let mut out = Output::default();
+        tcp_metrics(&mut out, &base(), &net, None);
+        udp_metrics(&mut out, &base(), &net, None);
+        let mut buf = String::new();
+        out.render(&mut buf);
+        for line in [
+            "# TYPE container_network_tcp_usage_total gauge",
+            r#"container_network_tcp_usage_total{id="/c",tcp_state="established"} 3"#,
+            r#"container_network_tcp_usage_total{id="/c",tcp_state="listen"} 2"#,
+            r#"container_network_tcp_usage_total{id="/c",tcp_state="closing"} 0"#,
+            r#"container_network_tcp6_usage_total{id="/c",tcp_state="listen"} 1"#,
+            r#"container_network_udp_usage_total{id="/c",udp_state="listen"} 4"#,
+            r#"container_network_udp6_usage_total{id="/c",udp_state="dropped"} 7"#,
+        ] {
+            assert!(buf.lines().any(|l| l == line), "missing {line:?} in\n{buf}");
+        }
+        assert_eq!(buf.lines().filter(|l| l.starts_with("container_network_tcp")).count(), 22);
+        assert_eq!(buf.lines().filter(|l| l.starts_with("container_network_udp")).count(), 8);
+    }
+
+    #[test]
+    fn every_pushed_family_is_rendered() {
+        // A family missing from FAMILIES would be dropped silently (the cfs
+        // and quota families were, until #40).
+        let src = include_str!("collect.rs");
+        let code = src.split("#[cfg(test)]").next().unwrap();
+        for chunk in code.split('"') {
+            if (chunk.starts_with("container_") || chunk.starts_with("machine_"))
+                && chunk.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                && !chunk.ends_with('_')
+                && chunk != "machine_id" // a label name
+            {
+                assert!(crate::families::family(chunk).is_some(), "{chunk} is pushed but not in FAMILIES");
+            }
+        }
+    }
+
+    #[test]
+    fn proto_and_text_carry_the_same_families() {
+        let mut out = Output::default();
+        out.push("container_last_seen", vec![("id".into(), "/".into())], 2.0, Some(7));
+        out.push("machine_scrape_error", vec![], 0.0, None);
+        let mut pb = Vec::new();
+        out.render_proto(&mut pb);
+        // Two delimited families, in name order.
+        let first = pb[0] as usize;
+        assert_eq!(&pb[1..4], &[0x0a, 19, b'c']);
+        assert_eq!(&pb[3..22], b"container_last_seen");
+        let second = &pb[1 + first..];
+        assert_eq!(second[0] as usize, second.len() - 1);
+        assert_eq!(&second[3..23], b"machine_scrape_error");
     }
 
     #[test]

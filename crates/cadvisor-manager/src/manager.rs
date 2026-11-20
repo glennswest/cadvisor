@@ -61,6 +61,61 @@ pub struct ManagerConfig {
     /// Directory of stormpump workload identity records (rustkube-node#84);
     /// empty = `/run/rustkube/workloads`, then `/hostrun/rustkube/workloads`.
     pub workload_identity_dir: String,
+    /// Optional stats collected only when their metric group is enabled, as
+    /// upstream gates them on `includedMetrics` (#40).
+    pub collect: Collect,
+}
+
+/// Which optional stats housekeeping reads. All off by default: upstream's
+/// default `-disable_metrics` lists `tcp`, `udp`, `sched` and `hugetlb`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Collect {
+    /// `/proc/<pid>/net/tcp` and `tcp6` connection states (`tcp`).
+    pub tcp: bool,
+    /// `/proc/<pid>/net/udp` and `udp6` (`udp`).
+    pub udp: bool,
+    /// `/proc/<pid>/schedstat` of every process in the cgroup tree (`sched`).
+    pub sched: bool,
+    /// `hugetlb.<size>.{current,events}` (`hugetlb`).
+    pub hugetlb: bool,
+}
+
+/// Upstream's `schedulerStatsFromProcs` state: the last reading per live
+/// pid, plus the totals of pids that have exited, so the counters never go
+/// backwards when a process ends.
+#[derive(Debug, Default)]
+pub struct SchedCache {
+    live: HashMap<u32, v1::CpuSchedstat>,
+    exited: v1::CpuSchedstat,
+}
+
+impl SchedCache {
+    /// Folds one round of `(pid, reading)` into the cache and returns the
+    /// container's totals.
+    pub fn update(&mut self, readings: impl IntoIterator<Item = (u32, v1::CpuSchedstat)>) -> v1::CpuSchedstat {
+        let mut alive = HashSet::new();
+        for (pid, r) in readings {
+            alive.insert(pid);
+            self.live.insert(pid, r);
+        }
+        let exited = &mut self.exited;
+        self.live.retain(|pid, r| {
+            if alive.contains(pid) {
+                return true;
+            }
+            exited.run_time += r.run_time;
+            exited.runqueue_time += r.runqueue_time;
+            exited.run_periods += r.run_periods;
+            false
+        });
+        let mut total = self.exited.clone();
+        for r in self.live.values() {
+            total.run_time += r.run_time;
+            total.runqueue_time += r.runqueue_time;
+            total.run_periods += r.run_periods;
+        }
+        total
+    }
 }
 
 impl Default for ManagerConfig {
@@ -79,6 +134,7 @@ impl Default for ManagerConfig {
             crio_socket: "/var/run/crio/crio.sock".to_string(),
             env_metadata_whitelist: Vec::new(),
             workload_identity_dir: String::new(),
+            collect: Collect::default(),
         }
     }
 }
@@ -97,6 +153,8 @@ pub struct ContainerHandle {
     /// periodic directory walk.
     pub rootfs_diff: Option<String>,
     pub fs_usage: RwLock<(u64, u64)>,
+    /// Per-pid schedstat readings (only with `Collect::sched`).
+    pub sched: Mutex<SchedCache>,
     task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
@@ -508,6 +566,7 @@ impl Manager {
             reports_network: std::sync::atomic::AtomicBool::new(name == "/"),
             rootfs_diff,
             fs_usage: RwLock::new((0, 0)),
+            sched: Mutex::new(SchedCache::default()),
             task: Mutex::new(None),
         });
         if let Some(meta) = meta {
@@ -635,6 +694,34 @@ impl Manager {
                 stats.network.interface = first.clone();
             }
             stats.network.interfaces = interfaces;
+        }
+        if handle.reports_network.load(std::sync::atomic::Ordering::Relaxed)
+            && let Some(pid) = pid
+        {
+            let net = |f: &str| std::fs::read_to_string(format!("/proc/{pid}/net/{f}")).ok();
+            if self.cfg.collect.tcp {
+                stats.network.tcp = net("tcp").map(|c| parse::parse_tcp_states(&c)).unwrap_or_default();
+                stats.network.tcp6 = net("tcp6").map(|c| parse::parse_tcp_states(&c)).unwrap_or_default();
+            }
+            if self.cfg.collect.udp {
+                stats.network.udp = net("udp").map(|c| parse::parse_udp_stats(&c)).unwrap_or_default();
+                stats.network.udp6 = net("udp6").map(|c| parse::parse_udp_stats(&c)).unwrap_or_default();
+            }
+        }
+        if self.cfg.collect.sched
+            && let Ok(pids) = self.reader.procs_recursive(name)
+        {
+            // A process that exits between the listing and the read is
+            // left out of this round (and kept as exited by the cache).
+            let readings = pids.into_iter().filter_map(|p| {
+                let c = std::fs::read_to_string(format!("/proc/{p}/schedstat")).ok()?;
+                let (run_time, runqueue_time, run_periods) = parse::parse_schedstat(&c)?;
+                Some((p, v1::CpuSchedstat { run_time, runqueue_time, run_periods }))
+            });
+            stats.cpu.schedstat = handle.sched.lock().unwrap().update(readings);
+        }
+        if self.cfg.collect.hugetlb {
+            stats.hugetlb = self.reader.read_hugetlb(name).unwrap_or_default();
         }
         if name == "/" {
             self.fill_root_stats(&mut stats)?;
@@ -985,5 +1072,24 @@ mod disk_tests {
         assert_eq!(unknown_disks(&entries, &map), ["259:1", "259:2"]);
         let named = v1::PerDiskStats { device: "/dev/x".into(), ..entry(8, 0) };
         assert!(unknown_disks(&[named], &map).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod sched_tests {
+    use super::*;
+
+    fn r(run_time: u64, runqueue_time: u64, run_periods: u64) -> v1::CpuSchedstat {
+        v1::CpuSchedstat { run_time, runqueue_time, run_periods }
+    }
+
+    #[test]
+    fn an_exited_pid_keeps_its_time() {
+        let mut c = SchedCache::default();
+        assert_eq!(c.update([(1, r(10, 1, 2)), (2, r(5, 2, 1))]), r(15, 3, 3));
+        // pid 2 exits; pid 1 runs on: totals never go backwards.
+        assert_eq!(c.update([(1, r(20, 1, 4))]), r(25, 3, 5));
+        assert_eq!(c.update([(1, r(20, 1, 4)), (3, r(1, 0, 1))]), r(26, 3, 6));
+        assert_eq!(c.update([]), r(26, 3, 6));
     }
 }
