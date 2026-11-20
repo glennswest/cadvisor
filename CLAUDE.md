@@ -292,7 +292,12 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- (none)
+- 2026-11-20 — #42 review findings in manager.rs: `0cfda650cfd7` mount table
+  re-read with machine info (shared `Arc<FsService>` snapshot);
+  `de041f31067b` containerd reconnect (success cached only), NotFound
+  retried, raw runtime handles re-enriched by housekeeping. Tests in
+  `manager::refresh_tests` (fake CRI-O socket). Root `has_filesystem` is
+  forced false by add_container (pre-existing; to file).
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off

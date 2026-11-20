@@ -40,6 +40,64 @@ pub fn check_cgroup2(root: &str) -> Result<(), ManagerError> {
 /// workload record on every housekeeping tick.
 const IDENTITY_GRACE: Duration = Duration::from_secs(30);
 
+/// After a failed containerd connection, how long before the next attempt
+/// (#42 `de041f31067b`: a socket that appears later is used then).
+const CONNECT_RETRY: Duration = Duration::from_secs(10);
+
+/// A runtime client connected on first use. Only a success is kept; a
+/// failure is retried after `retry`, so a runtime that starts after cadvisor
+/// is picked up (#42 `de041f31067b`).
+struct Reconnect<T> {
+    client: Option<Arc<T>>,
+    failed_at: Option<std::time::Instant>,
+    logged: bool,
+}
+
+impl<T> Default for Reconnect<T> {
+    fn default() -> Self {
+        Reconnect { client: None, failed_at: None, logged: false }
+    }
+}
+
+impl<T> Reconnect<T> {
+    async fn get<E: std::fmt::Display, F: std::future::Future<Output = Result<T, E>>>(
+        &mut self,
+        retry: Duration,
+        connect: impl FnOnce() -> F,
+    ) -> Option<Arc<T>> {
+        if let Some(c) = &self.client {
+            return Some(Arc::clone(c));
+        }
+        if self.failed_at.is_some_and(|t| t.elapsed() < retry) {
+            return None;
+        }
+        match connect().await {
+            Ok(c) => {
+                if self.logged {
+                    tracing::info!("containerd connected");
+                }
+                let c = Arc::new(c);
+                self.client = Some(Arc::clone(&c));
+                Some(c)
+            }
+            Err(e) => {
+                if !self.logged {
+                    tracing::info!(error = %e, "containerd not available (retried every {}s)", retry.as_secs());
+                    self.logged = true;
+                }
+                self.failed_at = Some(std::time::Instant::now());
+                None
+            }
+        }
+    }
+}
+
+/// Whether a cgroup basename names a runtime container that the runtime
+/// chain can enrich (a 64-hex id; not a CRI-O conmon shim).
+fn runtime_candidate(basename: &str) -> bool {
+    !basename.starts_with("crio-conmon-") && cadvisor_runtime::extract_container_id(basename).is_some()
+}
+
 #[derive(Debug, Clone)]
 pub struct ManagerConfig {
     pub cgroup_root: String,
@@ -151,14 +209,33 @@ pub struct ContainerHandle {
     pub reports_network: std::sync::atomic::AtomicBool,
     /// Writable-layer dir for fs accounting + cached (bytes, inodes) from the
     /// periodic directory walk.
-    pub rootfs_diff: Option<String>,
+    pub rootfs_diff: RwLock<Option<String>>,
     pub fs_usage: RwLock<(u64, u64)>,
     /// Per-pid schedstat readings (only with `Collect::sched`).
     pub sched: Mutex<SchedCache>,
+    /// A runtime container (64-hex cgroup) whose runtime metadata could not
+    /// be read yet: housekeeping retries it (#42 `de041f31067b`).
+    runtime_pending: std::sync::atomic::AtomicBool,
     task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
 impl ContainerHandle {
+    fn new(name: &str, spec: v1::ContainerSpec, storage_duration: Duration) -> Self {
+        ContainerHandle {
+            name: name.to_string(),
+            reference: RwLock::new(v1::ContainerReference { name: name.to_string(), ..Default::default() }),
+            spec: RwLock::new(spec),
+            store: Mutex::new(TimedStore::new(storage_duration)),
+            init_pid: RwLock::new(if name == "/" { Some(1) } else { None }),
+            reports_network: std::sync::atomic::AtomicBool::new(name == "/"),
+            rootfs_diff: RwLock::new(None),
+            fs_usage: RwLock::new((0, 0)),
+            sched: Mutex::new(SchedCache::default()),
+            runtime_pending: std::sync::atomic::AtomicBool::new(false),
+            task: Mutex::new(None),
+        }
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -167,7 +244,9 @@ impl ContainerHandle {
 pub struct Manager {
     cfg: ManagerConfig,
     reader: CgroupReader,
-    fs: FsService,
+    /// The mount table, re-read with machine info (#42 `0cfda650cfd7`). Each
+    /// reader takes one snapshot for its whole answer.
+    fs: RwLock<Arc<FsService>>,
     containers: RwLock<HashMap<String, Arc<ContainerHandle>>>,
     machine_info: RwLock<v1::MachineInfo>,
     /// `major:minor` keys seen in `io.stat` but missing from the disk map
@@ -176,7 +255,7 @@ pub struct Manager {
     version_info: v1::VersionInfo,
     events: Mutex<Vec<Arc<v1::Event>>>,
     event_tx: tokio::sync::broadcast::Sender<Arc<v1::Event>>,
-    containerd: tokio::sync::OnceCell<Option<cadvisor_runtime::ContainerdClient>>,
+    containerd: tokio::sync::Mutex<Reconnect<cadvisor_runtime::ContainerdClient>>,
     crio: cadvisor_runtime::CrioClient,
     workloads: cadvisor_runtime::WorkloadRecords,
 }
@@ -257,14 +336,14 @@ impl Manager {
         Ok(Manager {
             cfg,
             reader,
-            fs,
+            fs: RwLock::new(Arc::new(fs)),
             containers: RwLock::new(HashMap::new()),
             machine_info: RwLock::new(machine_info),
             disk_misses: Mutex::new(HashSet::new()),
             version_info,
             events: Mutex::new(Vec::new()),
             event_tx: tokio::sync::broadcast::channel(1024).0,
-            containerd: tokio::sync::OnceCell::new(),
+            containerd: tokio::sync::Mutex::new(Reconnect::default()),
             crio,
             workloads,
         })
@@ -278,11 +357,26 @@ impl Manager {
         self.machine_info.read().unwrap().clone()
     }
 
-    /// Re-reads machine info, as upstream does every
-    /// `-update_machine_info_interval`. On error the old info is kept.
+    fn fs(&self) -> Arc<FsService> {
+        Arc::clone(&self.fs.read().unwrap())
+    }
+
+    /// Re-reads the mount table and machine info, as upstream does every
+    /// `-update_machine_info_interval`: a filesystem mounted or unmounted
+    /// since is seen everywhere the mount table is used (#42
+    /// `0cfda650cfd7`). On error the old table and info are kept.
     pub fn refresh_machine_info(&self) {
-        match machine::machine_info(&self.fs, GoTime::now()) {
+        match FsService::new() {
+            Ok(fs) => self.install_fs(fs),
+            Err(e) => tracing::warn!(error = %e, "mountinfo re-read failed"),
+        }
+    }
+
+    /// Machine info from `fs`; on success both replace the old ones.
+    fn install_fs(&self, fs: FsService) {
+        match machine::machine_info(&fs, GoTime::now()) {
             Ok(mi) => {
+                *self.fs.write().unwrap() = Arc::new(fs);
                 *self.machine_info.write().unwrap() = mi;
                 self.disk_misses.lock().unwrap().clear();
             }
@@ -322,38 +416,30 @@ impl Manager {
         self.containers.read().unwrap().get(name).cloned()
     }
 
-    /// Lazily-connected containerd client (absent socket -> None, logged once).
-    async fn containerd(&self) -> Option<&cadvisor_runtime::ContainerdClient> {
+    /// The containerd client, connected on first use; a failed connection is
+    /// tried again after [`CONNECT_RETRY`] (logged once).
+    async fn containerd(&self) -> Option<Arc<cadvisor_runtime::ContainerdClient>> {
         self.containerd
-            .get_or_init(|| async {
-                match cadvisor_runtime::ContainerdClient::connect(
-                    &self.cfg.containerd_socket,
-                    &self.cfg.containerd_namespace,
-                )
-                .await
-                {
-                    Ok(c) => Some(c),
-                    Err(e) => {
-                        tracing::info!(socket = %self.cfg.containerd_socket, error = %e, "containerd not available");
-                        None
-                    }
-                }
+            .lock()
+            .await
+            .get(CONNECT_RETRY, || {
+                cadvisor_runtime::ContainerdClient::connect(&self.cfg.containerd_socket, &self.cfg.containerd_namespace)
             })
             .await
-            .as_ref()
     }
 
     /// Runtime metadata for a 64-hex container cgroup, via the factory chain
-    /// crio -> containerd (with retries for registration races). conmon shim
+    /// crio -> containerd, `attempts` times (registration races: a container
+    /// not found yet, or a transient error, is asked again). conmon shim
     /// cgroups stay raw (upstream's crio factory declines them; raw monitors
     /// them without enrichment).
-    async fn runtime_meta(&self, basename: &str) -> Option<cadvisor_runtime::ContainerMeta> {
-        if basename.starts_with("crio-conmon-") {
+    async fn runtime_meta(&self, basename: &str, attempts: u32) -> Option<cadvisor_runtime::ContainerMeta> {
+        if !runtime_candidate(basename) {
             return None;
         }
         let id = cadvisor_runtime::extract_container_id(basename)?;
         let is_crio = basename.starts_with("crio-");
-        for attempt in 0..3u32 {
+        for attempt in 0..attempts {
             if attempt > 0 {
                 tokio::time::sleep(Duration::from_millis(100 << attempt)).await;
             }
@@ -372,8 +458,11 @@ impl Manager {
             } else if let Some(client) = self.containerd().await {
                 match client.inspect(id).await {
                     Ok(meta) => return Some(meta),
-                    Err(cadvisor_runtime::RuntimeError::NotFound) => return None,
-                    Err(_) => continue,
+                    Err(cadvisor_runtime::RuntimeError::NotFound) => continue,
+                    Err(e) => {
+                        tracing::debug!(id, error = %e, "containerd inspect failed");
+                        continue;
+                    }
                 }
             } else {
                 return None;
@@ -407,6 +496,26 @@ impl Manager {
         }
         *handle.init_pid.write().unwrap() = meta.init_pid;
         handle.reports_network.store(meta.reports_network, std::sync::atomic::Ordering::Relaxed);
+        if meta.rootfs_diff.is_some() {
+            handle.spec.write().unwrap().has_filesystem = true;
+            *handle.rootfs_diff.write().unwrap() = meta.rootfs_diff;
+        }
+    }
+
+    /// A runtime container added before its runtime knew it (or before the
+    /// runtime's socket was up) gets its metadata once the runtime answers:
+    /// same cadence as [`Self::retry_workload_identity`] (#42 `de041f31067b`).
+    async fn retry_runtime_identity(&self, handle: &ContainerHandle) {
+        use std::sync::atomic::Ordering;
+        if !handle.runtime_pending.load(Ordering::Relaxed) {
+            return;
+        }
+        let basename = handle.name().rsplit('/').next().unwrap_or(handle.name());
+        if let Some(meta) = self.runtime_meta(basename, 1).await {
+            tracing::debug!(container = handle.name(), "runtime metadata found");
+            self.apply_meta(handle, meta);
+            handle.runtime_pending.store(false, Ordering::Relaxed);
+        }
     }
 
     /// A cgroup found before its workload record was written (the kubelet
@@ -553,24 +662,18 @@ impl Manager {
         // otherwise.
         let meta = match self.workload_meta(name) {
             Some(meta) => Some(meta),
-            None => self.runtime_meta(basename).await,
+            None => self.runtime_meta(basename, 3).await,
         };
-        let rootfs_diff = meta.as_ref().and_then(|m| m.rootfs_diff.clone());
-        spec.has_filesystem = rootfs_diff.is_some();
-        let handle = Arc::new(ContainerHandle {
-            name: name.to_string(),
-            reference: RwLock::new(v1::ContainerReference { name: name.to_string(), ..Default::default() }),
-            spec: RwLock::new(spec),
-            store: Mutex::new(TimedStore::new(self.cfg.storage_duration)),
-            init_pid: RwLock::new(if name == "/" { Some(1) } else { None }),
-            reports_network: std::sync::atomic::AtomicBool::new(name == "/"),
-            rootfs_diff,
-            fs_usage: RwLock::new((0, 0)),
-            sched: Mutex::new(SchedCache::default()),
-            task: Mutex::new(None),
-        });
-        if let Some(meta) = meta {
-            self.apply_meta(&handle, meta);
+        // Unchanged from before #42: has_filesystem only with a writable
+        // layer (apply_meta sets it), even for `/` (filed separately).
+        spec.has_filesystem = false;
+        let handle = Arc::new(ContainerHandle::new(name, spec, self.cfg.storage_duration));
+        match meta {
+            Some(meta) => self.apply_meta(&handle, meta),
+            None if name != "/" && runtime_candidate(basename) => {
+                handle.runtime_pending.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+            None => {}
         }
         {
             let mut map = self.containers.write().unwrap();
@@ -615,6 +718,7 @@ impl Manager {
             let slow_due = last_slow.elapsed() >= Duration::from_secs(60) || first_iteration;
             if handle.name() != "/" && (slow_due || added.elapsed() < IDENTITY_GRACE) {
                 self.retry_workload_identity(&handle);
+                self.retry_runtime_identity(&handle).await;
             }
             // Slow path (once a minute, plus once shortly after creation):
             // refresh writable-layer usage (upstream fsHandler cadence) and
@@ -623,7 +727,8 @@ impl Manager {
             if slow_due {
                 first_iteration = false;
                 last_slow = std::time::Instant::now();
-                if let Some(diff_dir) = &handle.rootfs_diff {
+                let diff_dir = handle.rootfs_diff.read().unwrap().clone();
+                if let Some(diff_dir) = diff_dir {
                     let usage =
                         cadvisor_host::fs::dir_usage(std::path::Path::new(diff_dir));
                     *handle.fs_usage.write().unwrap() = usage;
@@ -725,11 +830,12 @@ impl Manager {
         }
         if name == "/" {
             self.fill_root_stats(&mut stats)?;
-        } else if let Some(diff_dir) = &handle.rootfs_diff {
+        } else if let Some(diff_dir) = handle.rootfs_diff.read().unwrap().clone() {
             // Runtime container writable layer: partition capacity/inodes
             // from statfs, usage from the cached directory walk.
-            if let Some(p) = self.fs.partition_for_path(diff_dir)
-                && let Ok(u) = self.fs.usage(&p.mountpoint)
+            let fs = self.fs();
+            if let Some(p) = fs.partition_for_path(&diff_dir)
+                && let Ok(u) = fs.usage(&p.mountpoint)
             {
                 let (du_bytes, _) = *handle.fs_usage.read().unwrap();
                 stats.filesystem.push(v1::FsStats {
@@ -750,6 +856,7 @@ impl Manager {
     }
 
     fn fill_root_stats(&self, stats: &mut v1::ContainerStats) -> Result<(), ManagerError> {
+        let fs = self.fs();
         // Root has no memory.current; upstream derives usage from meminfo.
         if let Ok(content) = std::fs::read_to_string("/proc/meminfo") {
             let mut total = 0u64;
@@ -769,9 +876,9 @@ impl Manager {
         }
 
         // Global filesystem stats + disk IO counters.
-        let disk = self.fs.disk_stats().unwrap_or_default();
-        for p in self.fs.partitions() {
-            let Ok(u) = self.fs.usage(&p.mountpoint) else { continue };
+        let disk = fs.disk_stats().unwrap_or_default();
+        for p in fs.partitions() {
+            let Ok(u) = fs.usage(&p.mountpoint) else { continue };
             let d = disk.get(&(p.major, p.minor));
             stats.filesystem.push(v1::FsStats {
                 device: p.device.clone(),
@@ -957,11 +1064,12 @@ impl Manager {
 
     /// v2 /storage endpoint: runtime capacity/usage per filesystem.
     pub fn storage_info(&self) -> Vec<cadvisor_model::v2::FsInfo> {
+        let fs = self.fs();
         use cadvisor_model::v2;
         let now = GoTime::now();
         let mut out = Vec::new();
-        for p in self.fs.partitions() {
-            let Ok(u) = self.fs.usage(&p.mountpoint) else { continue };
+        for p in fs.partitions() {
+            let Ok(u) = fs.usage(&p.mountpoint) else { continue };
             out.push(v2::FsInfo {
                 timestamp: now,
                 device: p.device.clone(),
@@ -980,11 +1088,12 @@ impl Manager {
     /// v2.1 /machinestats filesystem section: per-partition capacity/usage
     /// plus /proc/diskstats counters (Duration fields are nanoseconds).
     pub fn machine_fs_stats(&self) -> Vec<cadvisor_model::v2::MachineFsStats> {
+        let fs = self.fs();
         use cadvisor_model::v2;
-        let disk = self.fs.disk_stats().unwrap_or_default();
+        let disk = fs.disk_stats().unwrap_or_default();
         let mut out = Vec::new();
-        for p in self.fs.partitions() {
-            let Ok(u) = self.fs.usage(&p.mountpoint) else { continue };
+        for p in fs.partitions() {
+            let Ok(u) = fs.usage(&p.mountpoint) else { continue };
             let d = disk.get(&(p.major, p.minor));
             let ms_to_ns = |ms: u64| Some((ms as i64) * 1_000_000);
             out.push(v2::MachineFsStats {
@@ -1091,5 +1200,157 @@ mod sched_tests {
         assert_eq!(c.update([(1, r(20, 1, 4))]), r(25, 3, 5));
         assert_eq!(c.update([(1, r(20, 1, 4)), (3, r(1, 0, 1))]), r(26, 3, 6));
         assert_eq!(c.update([]), r(26, 3, 6));
+    }
+}
+
+#[cfg(test)]
+mod refresh_tests {
+    //! #42: the mount table is re-read with machine info (`0cfda650cfd7`),
+    //! and runtime metadata is retried until the runtime answers
+    //! (`de041f31067b`).
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    fn scratch(tag: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("cadvisor-42-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn manager(dir: &std::path::Path) -> Manager {
+        let cg = dir.join("cgroup");
+        std::fs::create_dir_all(&cg).unwrap();
+        std::fs::write(cg.join("cgroup.controllers"), "cpu memory io pids\n").unwrap();
+        Manager::new(ManagerConfig {
+            cgroup_root: cg.to_string_lossy().into_owned(),
+            crio_socket: dir.join("crio.sock").to_string_lossy().into_owned(),
+            containerd_socket: dir.join("containerd.sock").to_string_lossy().into_owned(),
+            ..ManagerConfig::default()
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn a_mount_added_later_is_seen_and_a_removed_one_goes() {
+        let dir = scratch("fs");
+        let mnt = dir.join("mnt");
+        std::fs::create_dir_all(&mnt).unwrap();
+        let mgr = manager(&dir);
+        let dev = "/dev/sc42test";
+        let has = |mgr: &Manager| {
+            (
+                mgr.storage_info().iter().any(|f| f.device == dev),
+                mgr.machine_fs_stats().iter().any(|f| f.device == dev),
+                mgr.machine_info().filesystems.iter().any(|f| f.device == dev),
+            )
+        };
+        assert_eq!(has(&mgr), (false, false, false));
+
+        // Mounted after startup: in /storage, /machinestats and machine info.
+        let line = format!("99 1 253:7 / {} rw,relatime shared:1 - ext4 {dev} rw\n", mnt.display());
+        mgr.install_fs(FsService::from_mountinfo(&line));
+        assert_eq!(has(&mgr), (true, true, true));
+        let fs = mgr.storage_info().into_iter().find(|f| f.device == dev).unwrap();
+        assert_eq!(fs.mountpoint, mnt.to_string_lossy());
+
+        // Unmounted: the periodic refresh re-reads this machine's real
+        // mountinfo, which has no such device, and it is gone everywhere.
+        mgr.refresh_machine_info();
+        assert_eq!(has(&mgr), (false, false, false));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_failed_connection_is_not_kept() {
+        let calls = AtomicUsize::new(0);
+        let connect = |ok: bool| {
+            calls.fetch_add(1, Ordering::SeqCst);
+            async move { if ok { Ok(7u32) } else { Err("refused") } }
+        };
+        let mut conn = Reconnect::<u32>::default();
+        let long = Duration::from_secs(3600);
+        assert!(conn.get(long, || connect(false)).await.is_none());
+        // Within the retry interval: not tried again.
+        assert!(conn.get(long, || connect(true)).await.is_none());
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        // After it: tried, and the success is kept.
+        assert_eq!(conn.get(Duration::ZERO, || connect(true)).await.as_deref(), Some(&7));
+        assert_eq!(conn.get(Duration::ZERO, || connect(false)).await.as_deref(), Some(&7));
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+    }
+
+    /// A CRI-O socket answering `/containers/<id>`: 404 for the first
+    /// `misses` requests, then the container.
+    async fn fake_crio(sock: std::path::PathBuf, misses: usize) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::UnixListener::bind(&sock).unwrap();
+        let served = Arc::new(AtomicUsize::new(0));
+        tokio::spawn(async move {
+            while let Ok((mut s, _)) = listener.accept().await {
+                let served = Arc::clone(&served);
+                tokio::spawn(async move {
+                    let mut req = Vec::new();
+                    let mut buf = [0u8; 1024];
+                    while !req.windows(4).any(|w| w == b"\r\n\r\n") {
+                        match s.read(&mut buf).await {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => req.extend_from_slice(&buf[..n]),
+                        }
+                    }
+                    let body = r#"{"name":"web","pid":4242,"image":"docker.io/library/nginx:1.27","labels":{"io.kubernetes.container.name":"web","io.kubernetes.pod.name":"web-0"},"root":""}"#;
+                    let resp = if served.fetch_add(1, Ordering::SeqCst) < misses {
+                        "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n".to_string()
+                    } else {
+                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}", body.len())
+                    };
+                    let _ = s.write_all(resp.as_bytes()).await;
+                });
+            }
+        });
+    }
+
+    #[tokio::test]
+    async fn a_container_the_runtime_did_not_know_yet_is_enriched_later() {
+        let dir = scratch("rt");
+        let mgr = manager(&dir);
+        let id = "0123456789abcdef".repeat(4);
+        let name = format!("/kubepods.slice/crio-{id}.scope");
+        let h = ContainerHandle::new(&name, v1::ContainerSpec::default(), Duration::from_secs(60));
+        assert!(runtime_candidate(name.rsplit('/').next().unwrap()));
+        h.runtime_pending.store(true, Ordering::Relaxed);
+
+        // The runtime is not up yet: stays raw, still pending.
+        mgr.retry_runtime_identity(&h).await;
+        assert!(h.reference.read().unwrap().namespace.is_empty());
+        assert!(h.runtime_pending.load(Ordering::Relaxed));
+
+        // Up, but the container is not registered yet (404): still pending.
+        fake_crio(dir.join("crio.sock"), 1).await;
+        mgr.retry_runtime_identity(&h).await;
+        assert!(h.reference.read().unwrap().namespace.is_empty());
+        assert!(h.runtime_pending.load(Ordering::Relaxed));
+
+        // Registered: labels, image, init pid; no more retries.
+        mgr.retry_runtime_identity(&h).await;
+        let r = h.reference.read().unwrap().clone();
+        assert_eq!(r.namespace, "crio");
+        assert_eq!(r.aliases, vec!["web".to_string(), id.clone()]);
+        let spec = h.spec.read().unwrap().clone();
+        assert_eq!(spec.image, "docker.io/library/nginx:1.27");
+        assert_eq!(spec.labels.get("io.kubernetes.pod.name").map(String::as_str), Some("web-0"));
+        assert_eq!(*h.init_pid.read().unwrap(), Some(4242));
+        assert!(!h.runtime_pending.load(Ordering::Relaxed));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn only_runtime_containers_are_retried() {
+        let id = "0123456789abcdef".repeat(4);
+        assert!(runtime_candidate(&format!("crio-{id}.scope")));
+        assert!(runtime_candidate(&format!("cri-containerd-{id}.scope")));
+        assert!(!runtime_candidate(&format!("crio-conmon-{id}.scope")));
+        assert!(!runtime_candidate("system.slice"));
+        assert!(!runtime_candidate("w7f3a-1"));
     }
 }

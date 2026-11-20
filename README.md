@@ -39,7 +39,11 @@ A slide deck on its purpose and functionality is in
   over HTTP/1 on its unix socket (`GET /info`, `GET /containers/<id>`).
   Container ids are the 64-hex ids found in cgroup names (`crio-<id>.scope`,
   `cri-containerd-<id>.scope`, `libpod-<id>.scope`, …). If a socket is
-  missing, those containers are monitored as raw cgroups. Only the pod sandbox
+  missing, those containers are monitored as raw cgroups until the runtime
+  answers: a failed containerd connection is tried again after 10 s, and a
+  container the runtime does not know yet (a registration race) is asked
+  again on every housekeeping tick for its first 30 s, then once a minute,
+  until its labels, image and init PID are filled in (#42). Only the pod sandbox
   container reports network stats, which it reads from its init PID's
   `/proc/<pid>/net`.
 - **stormcos pods: the kubelet's workload records** (#3). On stormcos, pods
@@ -73,7 +77,10 @@ A slide deck on its purpose and functionality is in
   `oom` + `oomKill` events whenever `memory.events` `oom_kill` goes up. Events
   are served on `/api/v1.3/events` and `/api/v2.x/events`.
 - **Machine info is re-read every `-update_machine_info_interval`** (5m, as
-  upstream): CPU topology, memory, filesystems, NICs and the disk map
+  upstream): CPU topology, memory, the mount table (`/proc/self/mountinfo`:
+  a filesystem mounted or unmounted since appears in or leaves machine info,
+  the root container's filesystem stats, `/api/v2.0/storage` and
+  `/api/v2.1/machinestats`, #42), NICs and the disk map
   (`major:minor` → device name). The disk map is also re-scanned as soon as a
   container's `io.stat` names a device it lacks, once per new device, so a
   volume attached after startup (a stormblock ublk / nvme-tcp volume) is named
