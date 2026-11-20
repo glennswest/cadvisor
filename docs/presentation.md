@@ -109,11 +109,10 @@ Seven crates: `cadvisor` (binary), `-model` (wire types), `-host`, `-runtime`,
 ## What it does today (2/2) — serving
 
 - **`/metrics`**: Prometheus text 0.0.4, byte-compatible with v0.49.2 at default
-  flags — family names, HELP/TYPE, label sets, Go float formatting, per-sample
-  timestamps. `--disable-metrics` / `--enable-metrics` select groups `cpu`,
-  `cpuLoad`, `memory`, `disk`, `diskIO`, `network`, `oom_event`; enabling any
-  other group is refused at startup (#38). A repeated series is
-  served once, first wins, as client_golang does (#14).
+  flags, or delimited protobuf when `Accept` prefers it (#40). Groups: the
+  defaults plus `tcp`, `udp`, `sched`, `hugetlb` (off, as upstream) and
+  `percpu`; enabling any other is refused at startup (#38). A repeated
+  series is served once, first wins, as client_golang does (#14).
 - **REST**: `/api/v1.0`–`v1.3` (machine, containers, subcontainers, docker,
   events with the upstream query parameters and `stream=true`) and
   `/api/v2.0`–`v2.1` (version, machine, attributes, stats, spec, summary, ps,
@@ -211,9 +210,9 @@ accepted: `--housekeeping-interval 1s`, `--max-housekeeping-interval 60s`,
   machine stats (plan in `rustkube-node/docs/planning/cadvisor-integration.md`,
   rustkube-node#21). Nothing of it is in this repo yet; today the kubelet serves
   its own `/metrics/cadvisor` from CRI stats.
-- Not planned: protobuf responses and upstream's default-off metric groups
-  (tcp/udp, sched, hugetlb, perf, resctrl). Their names are accepted and emit
-  nothing, as in a default upstream build. PSI stays off, as in v0.49.2.
+- Not built: upstream's `advtcp`, `process`, `memory_numa`, `perf_event`,
+  `resctrl` and the other groups no one reads; `-disable_metrics` takes their
+  names, `-enable_metrics` refuses them. PSI stays off, as in v0.49.2.
 
 ---
 

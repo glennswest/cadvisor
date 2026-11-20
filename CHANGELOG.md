@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### 2026-11-20
+- **feat:** optional metric groups `tcp`, `udp`, `sched` and `hugetlb` (#40; the owner asked for them in ironprom and the console). `container_network_{tcp,tcp6}_usage_total` by `tcp_state` and `container_network_{udp,udp6}_usage_total` by `udp_state` from `/proc/<pid>/net/*`; `container_cpu_schedstat_*` from `/proc/<pid>/schedstat` over the cgroup tree, keeping the time of exited processes; `container_hugetlb_*` by `pagesize` from `hugetlb.<size>.{current,events}`. Each is read only while its group is on. `-disable_metrics` now defaults to upstream v0.49.2's list, so they are off unless enabled, and a `-disable_metrics` list replaces the default, as upstream.
+- **feat:** `percpu` is a group: on (the default) `cpu="total"` appears once usage is above 0; off, for every container from the first sample, as upstream. cgroup v2 has no per-CPU usage, so there is no `cpu="cpuNN"` series either way.
+- **feat:** `/metrics` serves delimited `io.prometheus.client.MetricFamily` protobuf when `Accept` prefers it (Prometheus and ironprom ask for it first), with expfmt's `Content-Type`. Text is unchanged.
+- **fix:** `container_cpu_cfs_periods_total`, `container_cpu_cfs_throttled_periods_total`, `container_cpu_cfs_throttled_seconds_total` and `container_spec_cpu_quota` were collected but never rendered (missing from the family table). They now appear for containers with a CPU quota, as upstream. A test fails if a pushed family is missing from the table.
+
 ### 2026-11-19
 - **chore:** #25 re-shipped. The master applied the registry `apis` (`stats`, `metrics`) on 2026-11-20 UTC; `component export` shows both. Golden build 4346a1920288 (cadvisor@ab0d15b) is the first built with them, so its stormd config probes both APIs. Same proof as before: the node's API health snapshot lists cadvisor's `stats`. No code change.
 - **fix:** metric-group flags no longer accept groups that render nothing (#38, stub sweep). `-enable_metrics` takes only the groups `/metrics` renders (`cpu`, `cpuLoad`, `memory`, `disk`, `diskIO`, `network`, `oom_event`). `-disable_metrics` takes any upstream v0.49.2 group name, because a group cadvisor-rs does not render is off already. A name upstream does not know is refused by both flags, as upstream refuses it. Both are checked at startup. Before this, `-enable_metrics=tcp` was accepted and emitted nothing. Tests: `metric_groups_disable_and_enable`, `metric_groups_refuse_unknown_and_unbuilt`.

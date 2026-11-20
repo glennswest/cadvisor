@@ -90,9 +90,10 @@ A slide deck on its purpose and functionality is in
   containerd's OCI spec (`process.env`). CRI-O containers get none, because
   CRI-O's inspect API has no environment; upstream collects it only for
   containerd and docker too. stormpump records carry no environment.
-- **Metric groups (#38).** `/metrics` renders the groups `cpu`, `cpuLoad`,
-  `memory`, `disk`, `diskIO`, `network` and `oom_event`. Those are the only
-  names `-enable_metrics` takes. See [Flags](#flags) for the rules.
+- **Metric groups (#38, #40).** `/metrics` renders the groups `cpu`,
+  `cpuLoad`, `memory`, `disk`, `diskIO`, `network`, `oom_event` and `percpu`
+  by default, and `tcp`, `udp`, `sched` and `hugetlb` when enabled. Those are
+  the only names `-enable_metrics` takes. See [Flags](#flags) for the rules.
 
 ## Endpoints
 
@@ -104,7 +105,7 @@ health paths needs a token ([TLS and auth](#tls-and-auth)).
 | Path | What |
 |---|---|
 | `/healthz`, `/-/healthy`, `/-/ready` | Always `200 ok` once the listener is up. These do not check the collectors. `stormd` probes `/healthz`. |
-| `/metrics` | Prometheus text format 0.0.4, byte-compatible with v0.49.2 at default flags: family names, HELP/TYPE lines, label sets, Go float formatting and per-sample timestamps. A series is never repeated. When two samples would share a name and labels (two `io.stat` devices missing from the disk map both get `device=""`), the first is served, as upstream's client_golang does (#14). |
+| `/metrics` | Prometheus text format 0.0.4, byte-compatible with v0.49.2 at default flags: family names, HELP/TYPE lines, label sets, Go float formatting and per-sample timestamps. A series is never repeated. When two samples would share a name and labels (two `io.stat` devices missing from the disk map both get `device=""`), the first is served, as upstream's client_golang does (#14). When the `Accept` header prefers `application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited` (by `q`, as expfmt negotiates), the same families are served as length-delimited `MetricFamily` protobuf (#40). Prometheus and ironprom ask for it first. |
 | `/api`, `/api/` | `400`, listing the supported API versions (`v1.0,v1.1,v1.2,v1.3,v2.0,v2.1`). |
 | `/api/v1.x/machine`, `/containers/<name>` | v1.0+ |
 | `/api/v1.x/subcontainers/<name>` | v1.1+ |
@@ -146,8 +147,8 @@ mean `true`, as in Go.
 | `-global_housekeeping_interval` | `1m0s` | Full cgroup-tree rediscovery sweep |
 | `-storage_duration` | `2m0s` | How long samples stay in the in-memory ring buffer |
 | `-update_machine_info_interval` | `5m0s` | How often machine info (disk map, filesystems, NICs, memory) is re-read |
-| `-disable_metrics` | `""` | Comma-separated metric groups to leave out of `/metrics`. Any upstream group name is taken. |
-| `-enable_metrics` | `""` | If set, only these groups are emitted. It overrides `-disable_metrics`. Only the seven groups cadvisor-rs renders are taken. |
+| `-disable_metrics` | `advtcp,cpu_topology,cpuset,hugetlb,memory_numa,process,referenced_memory,resctrl,sched,tcp,udp` (upstream's) | Comma-separated metric groups to leave out of `/metrics`. Any upstream group name is taken. A list replaces the default, as upstream: `-disable_metrics=disk` turns `tcp`, `udp`, `sched` and `hugetlb` on. |
+| `-enable_metrics` | `""` | If set, only these groups are emitted. It overrides `-disable_metrics`. Only the twelve groups cadvisor-rs renders are taken. |
 | `-store_container_labels` | `true` | Export every runtime label as a `container_label_*` Prometheus label |
 | `-whitelisted_container_labels` | `""` | Labels to export when `-store_container_labels=false` |
 | `-env_metadata_whitelist` | `""` | Comma-separated env var key prefixes exported as `envs` / `container_env_*` (containerd only, as upstream) |
@@ -164,25 +165,39 @@ mean `true`, as in Go.
 | `--kube-token-file` | `""` | cadvisor's own ServiceAccount token for the review calls |
 | `--kube-node-name` | `""` (the hostname) | The node named in the SubjectAccessReview |
 
-These metric group names change the output: `cpu`, `cpuLoad`
-(`container_cpu_load_*` and `container_tasks_state`), `memory`,
-`disk` (fs usage, limits and inodes), `diskIO` (the other `container_fs_*` and
-`container_blkio_*` families), `network` and `oom_event`
-(`container_oom_events_total`). The cpu and memory spec
-families follow their group. `cadvisor_version_info`, `container_start_time_seconds`,
-`container_last_seen` and the `machine_*` families are always emitted. When
-`-enable_metrics` is set, each of those seven groups it does not name is
-disabled.
+These metric group names change the output: `cpu` (`container_cpu_*`
+seconds, and `container_cpu_cfs_*` and `container_spec_cpu_quota` when the
+container has a quota), `cpuLoad` (`container_cpu_load_*` and
+`container_tasks_state`), `memory`, `disk` (fs usage, limits and inodes),
+`diskIO` (the other `container_fs_*` and `container_blkio_*` families),
+`network` and `oom_event` (`container_oom_events_total`). The cpu and memory
+spec families follow their group. `cadvisor_version_info`,
+`container_start_time_seconds`, `container_last_seen` and the `machine_*`
+families are always emitted. When `-enable_metrics` is set, each group it
+does not name is disabled.
+
+The optional groups (#40). Each is read on housekeeping only while it is on,
+as upstream reads them, so a group that is off costs nothing:
+
+| Group | Default | Families | Read from |
+|---|---|---|---|
+| `tcp` | off | `container_network_tcp_usage_total`, `container_network_tcp6_usage_total`, by `tcp_state` (`established`, `synsent`, `synrecv`, `finwait1`, `finwait2`, `timewait`, `close`, `closewait`, `lastack`, `listen`, `closing`) | `/proc/<pid>/net/tcp`, `tcp6` of the container's init pid. Only the root and pod sandboxes have one, as for `network`; every other container reports 0s, as upstream. |
+| `udp` | off | `container_network_udp_usage_total`, `container_network_udp6_usage_total`, by `udp_state` (`listen`, `dropped`, `rxqueued`, `txqueued`) | `/proc/<pid>/net/udp`, `udp6`, as `tcp` |
+| `sched` | off | `container_cpu_schedstat_run_seconds_total`, `container_cpu_schedstat_runqueue_seconds_total`, `container_cpu_schedstat_run_periods_total` | `/proc/<pid>/schedstat` of every process in the cgroup and below it, each tick. A process that exits keeps its time in the totals, as upstream. |
+| `hugetlb` | off | `container_hugetlb_usage_bytes`, `container_hugetlb_failcnt`, `container_hugetlb_max_usage_bytes`, by `pagesize` (`2MB`, `1GB`) | `hugetlb.<size>.current` and the `max` count of `hugetlb.<size>.events`. cgroup v2 keeps no peak, so `max_usage` is 0, as upstream. A cgroup without the hugetlb controller has none. |
+| `percpu` | on | `container_cpu_usage_seconds_total` | cgroup v2 has no per-CPU usage, so it is `cpu="total"` either way. On, the series appears once usage is above 0; off, every container has it from the first sample, as upstream. |
+
+`/api` stats carry the same readings (`network.tcp`, `cpu.schedstat`,
+`hugetlb`) when the group is on.
 
 The flags are checked at startup, and a bad name stops cadvisor with an error:
 - A name upstream v0.49.2 does not know is refused by both flags, as upstream
   refuses it.
-- `-disable_metrics` takes the rest of upstream's names too (`tcp`, `udp`,
-  `advtcp`, `sched`, `percpu`, `hugetlb`, `perf_event`, `resctrl`, `process`,
-  `app`, `pressure`, `cpuset`, `cpu_topology`, `memory_numa`,
-  `referenced_memory`). cadvisor-rs renders none of those groups, so they are
-  off whether named or not. Upstream's default disable list therefore works
-  unchanged.
+- `-disable_metrics` takes the rest of upstream's names too (`advtcp`,
+  `perf_event`, `resctrl`, `process`, `app`, `pressure`, `cpuset`,
+  `cpu_topology`, `memory_numa`, `referenced_memory`). cadvisor-rs renders
+  none of those groups, so they are off whether named or not. Upstream's
+  default disable list therefore works unchanged.
 - `-enable_metrics` refuses those names. A group cadvisor-rs does not render
   cannot be turned on, so the flag never asks for families that would not
   appear.
