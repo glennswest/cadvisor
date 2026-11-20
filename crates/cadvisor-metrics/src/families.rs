@@ -96,6 +96,10 @@ pub const FAMILIES: &[(&str, Kind, &str)] = &[
     ("machine_swap_bytes", Kind::Gauge, "Amount of swap memory available on the machine."),
 ];
 
+pub fn family(name: &str) -> Option<&'static (&'static str, Kind, &'static str)> {
+    FAMILIES.iter().find(|(n, _, _)| *n == name)
+}
+
 #[cfg(test)]
 mod tests {
     /// client_golang gathers families sorted by name; render walks this list.
@@ -107,8 +111,4 @@ mod tests {
         sorted.dedup();
         assert_eq!(names, sorted);
     }
-}
-
-pub fn family(name: &str) -> Option<&'static (&'static str, Kind, &'static str)> {
-    FAMILIES.iter().find(|(n, _, _)| *n == name)
 }
