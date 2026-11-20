@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### 2026-11-19
+- **chore:** #25 re-shipped. The master applied the registry `apis` (`stats`, `metrics`) on 2026-11-20 UTC; `component export` shows both. Golden build 4346a1920288 (cadvisor@ab0d15b) is the first built with them, so its stormd config probes both APIs. Same proof as before: the node's API health snapshot lists cadvisor's `stats`. No code change.
 - **fix:** metric-group flags no longer accept groups that render nothing (#38, stub sweep). `-enable_metrics` takes only the groups `/metrics` renders (`cpu`, `cpuLoad`, `memory`, `disk`, `diskIO`, `network`, `oom_event`). `-disable_metrics` takes any upstream v0.49.2 group name, because a group cadvisor-rs does not render is off already. A name upstream does not know is refused by both flags, as upstream refuses it. Both are checked at startup. Before this, `-enable_metrics=tcp` was accepted and emitted nothing. Tests: `metric_groups_disable_and_enable`, `metric_groups_refuse_unknown_and_unbuilt`.
 - **docs:** The README line on unbuilt groups and protobuf is gone. The metric-group rules are under Flags; the presentation and the module docs are updated too (`cadvisor-model` doc: JSON only, `accelerators` always served empty; closes #39). The unbuilt groups and protobuf exposition are filed as a `gap` issue.
 - **chore:** `deploy/check-stubs.sh` (copied from stormcentral, #1455) runs in `make test`; README lists it under sc-build.
