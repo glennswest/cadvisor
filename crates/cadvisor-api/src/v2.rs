@@ -445,7 +445,7 @@ mod machinestats_tests {
 
     fn sample(secs: i64, writes: u64, write_ms: u64, usage: u64) -> Arc<v1::ContainerStats> {
         let mut s = v1::ContainerStats {
-            timestamp: serde_json::from_value(serde_json::json!(format!("2026-11-21T00:00:{secs:02}Z"))).unwrap(),
+            timestamp: serde_json::from_str(&format!("\"2026-11-21T00:00:{secs:02}Z\"")).unwrap(),
             ..Default::default()
         };
         s.filesystem.push(v1::FsStats {
