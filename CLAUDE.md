@@ -37,6 +37,15 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-11-21 — #45 review finding `f2f527c85baf`: `/api/v2.1/machinestats`
+  takes each entry's filesystem from its own root sample
+  (`MachineFsStats::from_v1`, ms → ns), not from a read at request time.
+  #49 was the first cut of the new test (`GoTime` cannot come from
+  `serde_json::from_value`; 9b6a695). Verified: sc-build-9a470b218d on
+  9b6a695 (check-stubs, `make test` 125 tests incl.
+  `machinestats_tests::each_entry_has_its_own_samples_filesystem` and
+  `machine_fs_stats_from_v1_converts_ms_to_ns`, clippy -D warnings). No
+  golden requested.
 - 2026-11-21 — #44 review finding `a9c7ff6db1ab`: `/healthz/collecting`
   (503 when the root sample is stale/absent past 3 × the longest root
   interval); `stats` probe moved to it. Also #46/#48: e776e56 (#42) did not
@@ -300,10 +309,6 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- 2026-11-21 — #45 review finding `f2f527c85baf`: `/api/v2.1/machinestats`
-  filesystem per stored root sample (`MachineFsStats::from_v1`), not read at
-  request time. Tests `machinestats_tests`, `machine_fs_stats_from_v1_…`.
-  Next: sc-build, then close #45.
 - 2026-11-20 — #42 review findings in manager.rs: `0cfda650cfd7` mount table
   re-read with machine info (shared `Arc<FsService>` snapshot);
   `de041f31067b` containerd reconnect (success cached only), NotFound
