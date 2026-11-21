@@ -793,7 +793,7 @@ impl Manager {
                 let diff_dir = handle.rootfs_diff.read().unwrap().clone();
                 if let Some(diff_dir) = diff_dir {
                     let usage =
-                        cadvisor_host::fs::dir_usage(std::path::Path::new(diff_dir));
+                        cadvisor_host::fs::dir_usage(std::path::Path::new(&diff_dir));
                     *handle.fs_usage.write().unwrap() = usage;
                 }
                 if handle.name() != "/"

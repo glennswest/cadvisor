@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### 2026-11-21
+- **fix:** build: `Path::new(&diff_dir)` in housekeeping's writable-layer refresh; e776e56 (#42) passed a `String` and did not compile (#46, #48).
+
 ### 2026-11-20
 - **fix:** #44 `a9c7ff6db1ab`: new `/healthz/collecting` answers `503` once the root container's newest housekeeping sample is older than 3 × the longest root housekeeping interval (180 s by default), or there is none that long after start; `200` otherwise. The `stats` API health probe now points at it: `/api/v2.0/stats?count=1` and `/metrics` kept answering 200 with the last stored sample after housekeeping stopped. Tests: `collection_health_tests` (root reads made to fail → `stale`, then `ok`), `api_probes.rs` on the real binary. Registry `apis` edit sent to the master.
 - **fix:** #42 `0cfda650cfd7`: the mount table is re-read with machine info every `-update_machine_info_interval`, so a filesystem mounted or unmounted after startup shows up in (or leaves) machine info, root filesystem stats, `/api/v2.0/storage` and `/api/v2.1/machinestats`.
