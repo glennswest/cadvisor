@@ -245,6 +245,35 @@ pub struct MachineFsStats {
     pub disk_stats: DiskStats,
 }
 
+impl MachineFsStats {
+    /// One partition of a v1 sample, as upstream's `machineFsStatsFromV1`:
+    /// capacity from `limit`, durations from milliseconds to nanoseconds.
+    pub fn from_v1(fs: &v1::FsStats) -> Self {
+        let ms_to_ns = |ms: u64| Some((ms as i64).saturating_mul(1_000_000));
+        MachineFsStats {
+            device: fs.device.clone(),
+            fs_type: fs.fs_type.clone(),
+            capacity: Some(fs.limit),
+            usage: Some(fs.usage),
+            available: Some(fs.available),
+            inodes_free: Some(fs.inodes_free),
+            disk_stats: DiskStats {
+                reads_completed: Some(fs.reads_completed),
+                reads_merged: Some(fs.reads_merged),
+                sectors_read: Some(fs.sectors_read),
+                read_duration: ms_to_ns(fs.read_time),
+                writes_completed: Some(fs.writes_completed),
+                writes_merged: Some(fs.writes_merged),
+                sectors_written: Some(fs.sectors_written),
+                write_duration: ms_to_ns(fs.write_time),
+                io_in_progress: Some(fs.io_in_progress),
+                io_duration: ms_to_ns(fs.io_time),
+                weighted_io_duration: ms_to_ns(fs.weighted_io_time),
+            },
+        }
+    }
+}
+
 /// Machine-level per-partition disk stats. The Go `*time.Duration` fields
 /// marshal as integer nanoseconds.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -413,6 +442,38 @@ mod tests {
             v.as_object().unwrap().keys().collect::<Vec<_>>(),
             vec!["device", "type", "inline"]
         );
+    }
+
+    #[test]
+    fn machine_fs_stats_from_v1_converts_ms_to_ns() {
+        let v1fs = v1::FsStats {
+            device: "/dev/sda3".into(),
+            fs_type: "vfs".into(),
+            limit: 1000,
+            usage: 400,
+            available: 550,
+            inodes_free: 77,
+            reads_completed: 1,
+            reads_merged: 2,
+            sectors_read: 3,
+            read_time: 4,
+            writes_completed: 5,
+            writes_merged: 6,
+            sectors_written: 7,
+            write_time: 8,
+            io_in_progress: 9,
+            io_time: 10,
+            weighted_io_time: 11,
+            ..Default::default()
+        };
+        let m = MachineFsStats::from_v1(&v1fs);
+        assert_eq!((m.capacity, m.usage, m.available, m.inodes_free), (Some(1000), Some(400), Some(550), Some(77)));
+        let d = &m.disk_stats;
+        assert_eq!(d.read_duration, Some(4_000_000));
+        assert_eq!(d.write_duration, Some(8_000_000));
+        assert_eq!(d.io_duration, Some(10_000_000));
+        assert_eq!(d.weighted_io_duration, Some(11_000_000));
+        assert_eq!((d.reads_completed, d.sectors_written, d.io_in_progress), (Some(1), Some(7), Some(9)));
     }
 
     #[test]

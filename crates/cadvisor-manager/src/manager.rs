@@ -919,7 +919,6 @@ impl Manager {
     }
 
     fn fill_root_stats(&self, stats: &mut v1::ContainerStats) -> Result<(), ManagerError> {
-        let fs = self.fs();
         // Root has no memory.current; upstream derives usage from meminfo.
         if let Ok(content) = std::fs::read_to_string("/proc/meminfo") {
             let mut total = 0u64;
@@ -939,11 +938,20 @@ impl Manager {
         }
 
         // Global filesystem stats + disk IO counters.
+        stats.filesystem.extend(self.root_fs_stats());
+        Ok(())
+    }
+
+    /// Every partition's usage (statvfs) and I/O counters (/proc/diskstats),
+    /// read now: the root container's `filesystem`.
+    fn root_fs_stats(&self) -> Vec<v1::FsStats> {
+        let fs = self.fs();
         let disk = fs.disk_stats().unwrap_or_default();
+        let mut out = Vec::new();
         for p in fs.partitions() {
             let Ok(u) = fs.usage(&p.mountpoint) else { continue };
             let d = disk.get(&(p.major, p.minor));
-            stats.filesystem.push(v1::FsStats {
+            out.push(v1::FsStats {
                 device: p.device.clone(),
                 fs_type: "vfs".to_string(),
                 limit: u.capacity,
@@ -966,7 +974,7 @@ impl Manager {
                 weighted_io_time: d.map_or(0, |d| d.weighted_io_time),
             });
         }
-        Ok(())
+        out
     }
 
     /// Builds a v1 ContainerSpec for a raw cgroup (root gets machine-level
@@ -1148,40 +1156,12 @@ impl Manager {
         out
     }
 
-    /// v2.1 /machinestats filesystem section: per-partition capacity/usage
-    /// plus /proc/diskstats counters (Duration fields are nanoseconds).
+    /// The root's filesystem section as it reads now (per-partition
+    /// capacity/usage plus /proc/diskstats counters, durations in
+    /// nanoseconds). `/api/v2.1/machinestats` does not use it: each of its
+    /// entries carries its own sample's filesystem (#45 `f2f527c85baf`).
     pub fn machine_fs_stats(&self) -> Vec<cadvisor_model::v2::MachineFsStats> {
-        let fs = self.fs();
-        use cadvisor_model::v2;
-        let disk = fs.disk_stats().unwrap_or_default();
-        let mut out = Vec::new();
-        for p in fs.partitions() {
-            let Ok(u) = fs.usage(&p.mountpoint) else { continue };
-            let d = disk.get(&(p.major, p.minor));
-            let ms_to_ns = |ms: u64| Some((ms as i64) * 1_000_000);
-            out.push(v2::MachineFsStats {
-                device: p.device.clone(),
-                fs_type: "vfs".to_string(),
-                capacity: Some(u.capacity),
-                usage: Some(u.capacity - u.free),
-                available: Some(u.available),
-                inodes_free: Some(u.inodes_free),
-                disk_stats: v2::DiskStats {
-                    reads_completed: Some(d.map_or(0, |d| d.reads_completed)),
-                    reads_merged: Some(d.map_or(0, |d| d.reads_merged)),
-                    sectors_read: Some(d.map_or(0, |d| d.sectors_read)),
-                    read_duration: ms_to_ns(d.map_or(0, |d| d.read_time)),
-                    writes_completed: Some(d.map_or(0, |d| d.writes_completed)),
-                    writes_merged: Some(d.map_or(0, |d| d.writes_merged)),
-                    sectors_written: Some(d.map_or(0, |d| d.sectors_written)),
-                    write_duration: ms_to_ns(d.map_or(0, |d| d.write_time)),
-                    io_in_progress: Some(d.map_or(0, |d| d.io_in_progress)),
-                    io_duration: ms_to_ns(d.map_or(0, |d| d.io_time)),
-                    weighted_io_duration: ms_to_ns(d.map_or(0, |d| d.weighted_io_time)),
-                },
-            });
-        }
-        out
+        self.root_fs_stats().iter().map(cadvisor_model::v2::MachineFsStats::from_v1).collect()
     }
 
     /// v1.3 events query (historical, non-streaming): last `max_events`

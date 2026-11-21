@@ -90,6 +90,14 @@ fn v2_network(n: &v1::NetworkStats) -> v2::NetworkStats {
 
 fn v2_stats(handle: &ContainerHandle, spec: &v1::ContainerSpec, count: i64) -> Vec<v2::ContainerStats> {
     let samples = handle.store.lock().unwrap().in_range(GoTime::zero(), GoTime::zero(), count);
+    v2_stats_of(handle, spec, &samples)
+}
+
+fn v2_stats_of(
+    handle: &ContainerHandle,
+    spec: &v1::ContainerSpec,
+    samples: &[Arc<v1::ContainerStats>],
+) -> Vec<v2::ContainerStats> {
     let mut out = Vec::with_capacity(samples.len());
     for (i, s) in samples.iter().enumerate() {
         let cpu_inst = if i > 0 {
@@ -364,19 +372,8 @@ pub async fn handle_v2(
                 return plain(StatusCode::INTERNAL_SERVER_ERROR, "could not get machine stats".into());
             };
             let spec = root.spec.read().unwrap().clone();
-            let stats: Vec<v2::MachineStats> = v2_stats(&root, &spec, 10)
-                .into_iter()
-                .map(|s| v2::MachineStats {
-                    timestamp: s.timestamp,
-                    cpu: s.cpu,
-                    cpu_inst: s.cpu_inst,
-                    memory: s.memory,
-                    network: s.network,
-                    filesystem: root_machine_fs(manager),
-                    load: None,
-                })
-                .collect();
-            json(&stats)
+            let samples = root.store.lock().unwrap().in_range(GoTime::zero(), GoTime::zero(), 10);
+            json(&machine_stats(&samples, v2_stats_of(&root, &spec, &samples)))
         }
         "spec" => match resolve(manager, container_name, &opts) {
             Err(e) => plain(
@@ -419,6 +416,71 @@ pub async fn handle_v2(
     }
 }
 
-fn root_machine_fs(manager: &Manager) -> Vec<v2::MachineFsStats> {
-    manager.machine_fs_stats()
+/// `/api/v2.1/machinestats` entries: each one's filesystem comes from its
+/// own root sample (#45 `f2f527c85baf`), not from a read made now, so a
+/// client taking rates over the history sees the counters move per sample.
+/// Upstream (`MachineStatsFromV1`) does the same.
+fn machine_stats(
+    samples: &[Arc<v1::ContainerStats>],
+    stats: Vec<v2::ContainerStats>,
+) -> Vec<v2::MachineStats> {
+    samples
+        .iter()
+        .zip(stats)
+        .map(|(sample, s)| v2::MachineStats {
+            timestamp: s.timestamp,
+            cpu: s.cpu,
+            cpu_inst: s.cpu_inst,
+            memory: s.memory,
+            network: s.network,
+            filesystem: sample.filesystem.iter().map(v2::MachineFsStats::from_v1).collect(),
+            load: None,
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod machinestats_tests {
+    use super::*;
+
+    fn sample(secs: i64, writes: u64, write_ms: u64, usage: u64) -> Arc<v1::ContainerStats> {
+        let mut s = v1::ContainerStats {
+            timestamp: serde_json::from_value(serde_json::json!(format!("2026-11-21T00:00:{secs:02}Z"))).unwrap(),
+            ..Default::default()
+        };
+        s.filesystem.push(v1::FsStats {
+            device: "/dev/sda3".into(),
+            fs_type: "vfs".into(),
+            limit: 1 << 30,
+            usage,
+            writes_completed: writes,
+            write_time: write_ms,
+            ..Default::default()
+        });
+        Arc::new(s)
+    }
+
+    #[test]
+    fn each_entry_has_its_own_samples_filesystem() {
+        let samples = vec![sample(10, 10, 5, 1000), sample(11, 25, 9, 2000)];
+        let stats: Vec<v2::ContainerStats> = samples
+            .iter()
+            .map(|s| v2::ContainerStats { timestamp: s.timestamp, ..Default::default() })
+            .collect();
+        let out = machine_stats(&samples, stats);
+        assert_eq!(out.len(), 2);
+        let got: Vec<_> = out
+            .iter()
+            .map(|m| {
+                let f = &m.filesystem[0];
+                (f.usage, f.disk_stats.writes_completed, f.disk_stats.write_duration)
+            })
+            .collect();
+        assert_eq!(
+            got,
+            vec![(Some(1000), Some(10), Some(5_000_000)), (Some(2000), Some(25), Some(9_000_000))]
+        );
+        assert_eq!(out[0].timestamp, samples[0].timestamp);
+        assert_eq!(out[1].timestamp, samples[1].timestamp);
+    }
 }

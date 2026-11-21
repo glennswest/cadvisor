@@ -300,6 +300,10 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
+- 2026-11-21 — #45 review finding `f2f527c85baf`: `/api/v2.1/machinestats`
+  filesystem per stored root sample (`MachineFsStats::from_v1`), not read at
+  request time. Tests `machinestats_tests`, `machine_fs_stats_from_v1_…`.
+  Next: sc-build, then close #45.
 - 2026-11-20 — #42 review findings in manager.rs: `0cfda650cfd7` mount table
   re-read with machine info (shared `Arc<FsService>` snapshot);
   `de041f31067b` containerd reconnect (success cached only), NotFound
