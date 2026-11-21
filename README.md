@@ -112,6 +112,7 @@ health paths needs a token ([TLS and auth](#tls-and-auth)).
 | Path | What |
 |---|---|
 | `/healthz`, `/-/healthy`, `/-/ready` | Always `200 ok` once the listener is up. These do not check the collectors. `stormd` probes `/healthz`. |
+| `/healthz/collecting` | Beyond upstream (#44). `200` while housekeeping keeps sampling the root container; `503` once the root's newest sample is older than three of the longest root housekeeping gaps (`-max_housekeeping_interval` with dynamic housekeeping, else `-housekeeping_interval`; 180 s by default), or there is still none that long after start. JSON body: `status` (`ok`, `starting`, `stale`, `absent`), `root_sample_age_ms`, `stale_after_ms`. Needs the token when auth is on. |
 | `/metrics` | Prometheus text format 0.0.4, byte-compatible with v0.49.2 at default flags: family names, HELP/TYPE lines, label sets, Go float formatting and per-sample timestamps. A series is never repeated. When two samples would share a name and labels (two `io.stat` devices missing from the disk map both get `device=""`), the first is served, as upstream's client_golang does (#14). When the `Accept` header prefers `application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited` (by `q`, as expfmt negotiates), the same families are served as length-delimited `MetricFamily` protobuf (#40). Prometheus and ironprom ask for it first. |
 | `/api`, `/api/` | `400`, listing the supported API versions (`v1.0,v1.1,v1.2,v1.3,v2.0,v2.1`). |
 | `/api/v1.x/machine`, `/containers/<name>` | v1.0+ |
@@ -327,11 +328,11 @@ down.
 
 | `name` | `probe` (on :9096) | What it reads | `p50_ms` / `p99_ms` / `timeout_s` |
 |---|---|---|---|
-| `stats` | `/api/v2.0/stats?count=1` | The root container's newest housekeeping sample. The read goes through the manager's container map and the root's sample store, the locks housekeeping writes under. | 100 / 1000 / 10 |
-| `metrics` | `/metrics` | The Prometheus scrape: every container's stats. | 200 / 2000 / 10 |
+| `stats` | `/healthz/collecting` | Whether the root container's newest housekeeping sample is recent: `503` when it is stale or missing. The read goes through the manager's container map and the root's sample store, the locks housekeeping writes under. | 100 / 1000 / 10 |
+| `metrics` | `/metrics` | The Prometheus scrape: every container's stats. It measures scrape cost; it serves the last samples however old, so collection health is the `stats` row's job. | 200 / 2000 / 10 |
 
 ```
-stormcentral component edit cadvisor --set 'apis=[{"name":"stats","probe":"/api/v2.0/stats?count=1","p50_ms":100,"p99_ms":1000,"timeout_s":10},{"name":"metrics","probe":"/metrics","p50_ms":200,"p99_ms":2000,"timeout_s":10}]'
+stormcentral component edit cadvisor --set 'apis=[{"name":"stats","probe":"/healthz/collecting","p50_ms":100,"p99_ms":1000,"timeout_s":10},{"name":"metrics","probe":"/metrics","p50_ms":200,"p99_ms":2000,"timeout_s":10}]'
 stormcentral component build cadvisor --force --no-wait
 ```
 
@@ -343,10 +344,15 @@ Until then the node's API health snapshot
 `restart_after_stalled_secs` is not set, so stormd never restarts cadvisor
 for a stall. No `token_file` is set either, because the golden has no auth
 yet. Once stormcos#143 turns TLS/auth on, both probes need a `token_file` and
-`health_scheme = "https"`. Before housekeeping's first sample, `stats`
-answers 200 with an empty list, so a starting cadvisor does not read as down.
+`health_scheme = "https"`. `/api/v2.0/stats` and `/metrics` only read
+stored samples: they answer 200 with the last sample however old, and
+`/api/v2.0/stats` with an empty list before the first one. So `stats` probes
+`/healthz/collecting` instead (#44): it goes `503` once housekeeping stops
+producing root samples, and stays 200 (`starting`) during the startup grace,
+so a starting cadvisor does not read as down.
 `crates/cadvisor/tests/api_probes.rs` runs the real binary against exactly
-these paths. Keep the test and this table in step.
+these paths; `cadvisor-manager`'s `collection_health_tests` make the root's
+reads fail and check the probe goes `stale`, then `ok` again. Keep the test and this table in step.
 
 **[`stormcos/docs/goldens.md`](https://github.com/glennswest/stormcos/blob/main/docs/goldens.md)
 is the authority for how goldens are built.** What that means here:

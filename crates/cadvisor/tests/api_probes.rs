@@ -3,9 +3,12 @@
 //! read, not `/healthz`, so this runs the real binary and asks exactly the
 //! declared paths:
 //!
-//! - `stats`: `/api/v2.0/stats?count=1` — the root container's newest
-//!   housekeeping sample, read through the manager's container map and the
-//!   root's sample store (the locks housekeeping writes under).
+//! - `stats`: `/healthz/collecting` — whether the root container's newest
+//!   housekeeping sample is recent, read through the manager's container map
+//!   and the root's sample store (the locks housekeeping writes under). 503
+//!   once housekeeping stops sampling (#44 `a9c7ff6db1ab`; the stale case is
+//!   `cadvisor-manager`'s `collection_health_tests`, which can make root
+//!   reads fail).
 //! - `metrics`: `/metrics` — the Prometheus scrape, which collects every
 //!   container's stats.
 //!
@@ -74,9 +77,8 @@ fn the_declared_probes_are_real_reads_that_answer() {
     );
     wait_until("/healthz", 30, || get(port, "/healthz").map(|r| r.0).ok() == Some(200));
 
-    // stats: once housekeeping has sampled the root, the probe returns that
-    // one sample. Before the first sample it is still a 200 (an empty list),
-    // so the probe never reads `down` while cadvisor starts.
+    // Wait for housekeeping's first root sample (the stats API answers 200
+    // with an empty list before it).
     let mut sample = serde_json::Value::Null;
     wait_until("a root sample from /api/v2.0/stats?count=1", 30, || {
         let Ok((status, body, _)) = get(port, "/api/v2.0/stats?count=1") else { return false };
@@ -97,13 +99,20 @@ fn the_declared_probes_are_real_reads_that_answer() {
     assert!(sample["timestamp"].is_string(), "root sample has a timestamp: {sample}");
     assert!(sample["cpu"].is_object() || sample["memory"].is_object(), "root sample has stats: {sample}");
 
+    // stats probe: 200 and `ok` now that the root has a fresh sample.
+    let (status, body, _) = get(port, "/healthz/collecting").unwrap();
+    assert_eq!(status, 200, "collection probe: {body}");
+    let v: serde_json::Value = serde_json::from_str(&body).expect("collection probe answers JSON");
+    assert_eq!(v["status"], "ok", "{body}");
+    assert!(v["root_sample_age_ms"].as_u64().unwrap() <= v["stale_after_ms"].as_u64().unwrap(), "{body}");
+
     // metrics: the scrape carries the root's CPU, the work cadvisor exists for.
     let (status, body, _) = get(port, "/metrics").unwrap();
     assert_eq!(status, 200);
     assert!(body.contains("container_cpu_usage_seconds_total{"), "scrape has container CPU");
 
     // Both are cheap: well inside the declared p50 budget (100 ms) here.
-    for p in ["/api/v2.0/stats?count=1", "/metrics"] {
+    for p in ["/healthz/collecting", "/metrics"] {
         let mut took: Vec<Duration> = (0..20).map(|_| get(port, p).unwrap().2).collect();
         took.sort();
         assert!(took[10] < Duration::from_millis(100), "{p}: p50 {:?}", took[10]);

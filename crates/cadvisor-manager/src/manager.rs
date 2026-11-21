@@ -258,6 +258,43 @@ pub struct Manager {
     containerd: tokio::sync::Mutex<Reconnect<cadvisor_runtime::ContainerdClient>>,
     crio: cadvisor_runtime::CrioClient,
     workloads: cadvisor_runtime::WorkloadRecords,
+    /// When the manager was made: the start of the startup grace of
+    /// [`Manager::collection_health`].
+    created: std::time::Instant,
+}
+
+/// Whether housekeeping is still producing root samples (#44
+/// `a9c7ff6db1ab`): the API health probe reads this, because the stats and
+/// metrics endpoints serve the last stored sample however old it is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CollectionHealth {
+    /// `ok`, `starting` (no root sample yet, within the grace), `stale` (the
+    /// newest root sample is too old) or `absent` (no root sample after the
+    /// grace).
+    pub status: &'static str,
+    /// Age of the newest root sample, if there is one.
+    pub root_sample_age: Option<Duration>,
+    /// A root sample older than this is stale; it is also the startup grace.
+    pub stale_after: Duration,
+}
+
+impl CollectionHealth {
+    /// `ok` and `starting` are healthy; `stale` and `absent` are not.
+    pub fn healthy(&self) -> bool {
+        matches!(self.status, "ok" | "starting")
+    }
+
+    /// The judgement, apart from the clocks: the newest root sample's age
+    /// (None: no sample), how long the manager has been up, and the bound.
+    pub fn judge(age: Option<Duration>, up: Duration, stale_after: Duration) -> Self {
+        let status = match age {
+            Some(a) if a <= stale_after => "ok",
+            Some(_) => "stale",
+            None if up <= stale_after => "starting",
+            None => "absent",
+        };
+        CollectionHealth { status, root_sample_age: age, stale_after }
+    }
 }
 
 /// Filter for the v1.3 events endpoint.
@@ -346,7 +383,33 @@ impl Manager {
             containerd: tokio::sync::Mutex::new(Reconnect::default()),
             crio,
             workloads,
+            created: std::time::Instant::now(),
         })
+    }
+
+    /// How old a root sample may be before housekeeping counts as stopped:
+    /// three of the longest gaps root housekeeping can leave between samples
+    /// (`-max_housekeeping_interval` when dynamic housekeeping is on, else
+    /// `-housekeeping_interval`). Defaults: 3 × 60 s = 180 s.
+    pub fn stale_after(&self) -> Duration {
+        let longest = if self.cfg.allow_dynamic_housekeeping {
+            self.cfg.max_housekeeping_interval.max(self.cfg.housekeeping_interval)
+        } else {
+            self.cfg.housekeeping_interval
+        };
+        longest * 3
+    }
+
+    /// Whether the root container's newest sample is recent (#44
+    /// `a9c7ff6db1ab`). Reads the manager's container map and the root's
+    /// sample store, the locks housekeeping writes under.
+    pub fn collection_health(&self) -> CollectionHealth {
+        let latest = self.handle("/").and_then(|h| h.store.lock().unwrap().latest());
+        let age = latest.map(|s| {
+            // A clock stepped back makes the sample "from the future": age 0.
+            (chrono::Utc::now() - s.timestamp.0).to_std().unwrap_or_default()
+        });
+        CollectionHealth::judge(age, self.created.elapsed(), self.stale_after())
     }
 
     pub fn config(&self) -> &ManagerConfig {
@@ -1352,5 +1415,113 @@ mod refresh_tests {
         assert!(!runtime_candidate(&format!("crio-conmon-{id}.scope")));
         assert!(!runtime_candidate("system.slice"));
         assert!(!runtime_candidate("w7f3a-1"));
+    }
+}
+
+#[cfg(test)]
+mod collection_health_tests {
+    //! #44 `a9c7ff6db1ab`: the collection health probe goes unhealthy when
+    //! housekeeping stops producing root samples, though the stats store
+    //! still holds the last one.
+    use super::*;
+
+    const S: Duration = Duration::from_secs(1);
+
+    #[test]
+    fn the_judgement() {
+        let bound = 3 * S;
+        let j = |age, up| CollectionHealth::judge(age, up, bound);
+        assert_eq!(j(Some(S), 10 * S).status, "ok");
+        assert_eq!(j(Some(bound), 10 * S).status, "ok");
+        assert_eq!(j(Some(4 * S), 10 * S).status, "stale");
+        assert_eq!(j(None, 2 * S).status, "starting");
+        assert_eq!(j(None, 4 * S).status, "absent");
+        assert!(j(Some(S), S).healthy() && j(None, S).healthy());
+        assert!(!j(Some(4 * S), S).healthy() && !j(None, 4 * S).healthy());
+    }
+
+    fn fixture(tag: &str) -> (std::path::PathBuf, ManagerConfig) {
+        let dir = std::env::temp_dir().join(format!("cadvisor-44-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let cg = dir.join("cgroup");
+        std::fs::create_dir_all(&cg).unwrap();
+        std::fs::write(cg.join("cgroup.controllers"), "cpu memory io pids\n").unwrap();
+        std::fs::write(cg.join("cpu.stat"), "usage_usec 1\nuser_usec 1\nsystem_usec 0\n").unwrap();
+        let cfg = ManagerConfig {
+            cgroup_root: cg.to_string_lossy().into_owned(),
+            housekeeping_interval: Duration::from_millis(50),
+            max_housekeeping_interval: Duration::from_millis(50),
+            crio_socket: dir.join("crio.sock").to_string_lossy().into_owned(),
+            containerd_socket: dir.join("containerd.sock").to_string_lossy().into_owned(),
+            workload_identity_dir: dir.join("workloads").to_string_lossy().into_owned(),
+            ..ManagerConfig::default()
+        };
+        (dir, cfg)
+    }
+
+    async fn wait_for(mgr: &Manager, want: &str) -> CollectionHealth {
+        let deadline = std::time::Instant::now() + 10 * S;
+        loop {
+            let h = mgr.collection_health();
+            if h.status == want {
+                return h;
+            }
+            assert!(std::time::Instant::now() < deadline, "never {want}: last {h:?}");
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    }
+
+    #[test]
+    fn the_bound_follows_the_housekeeping_flags() {
+        let (dir, cfg) = fixture("bound");
+        let dynamic = Manager::new(cfg.clone()).unwrap();
+        assert_eq!(dynamic.stale_after(), Duration::from_millis(150));
+        let fixed = Manager::new(ManagerConfig {
+            housekeeping_interval: Duration::from_millis(20),
+            max_housekeeping_interval: Duration::from_millis(500),
+            allow_dynamic_housekeeping: false,
+            ..cfg.clone()
+        })
+        .unwrap();
+        assert_eq!(fixed.stale_after(), Duration::from_millis(60));
+        let defaults = Manager::new(ManagerConfig { cgroup_root: cfg.cgroup_root, ..ManagerConfig::default() })
+            .unwrap();
+        assert_eq!(defaults.stale_after(), 180 * S);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn no_root_sample_past_the_grace_is_absent() {
+        let (dir, cfg) = fixture("absent");
+        // Never started: housekeeping takes no sample at all.
+        let mgr = Manager::new(cfg).unwrap();
+        assert_eq!(mgr.collection_health().status, "starting");
+        let h = wait_for(&mgr, "absent").await;
+        assert!(!h.healthy() && h.root_sample_age.is_none());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_sampler_that_stops_reads_stale_then_recovers() {
+        let (dir, cfg) = fixture("stale");
+        let cpu_stat = std::path::Path::new(&cfg.cgroup_root).join("cpu.stat");
+        let mgr = Arc::new(Manager::new(cfg).unwrap());
+        mgr.start().await.unwrap();
+        wait_for(&mgr, "ok").await;
+
+        // cpu.stat turned into a directory: every root read fails (EISDIR),
+        // so housekeeping stores nothing new while the old sample stays.
+        std::fs::remove_file(&cpu_stat).unwrap();
+        std::fs::create_dir(&cpu_stat).unwrap();
+        let h = wait_for(&mgr, "stale").await;
+        assert!(!h.healthy());
+        assert!(h.root_sample_age.unwrap() > h.stale_after, "{h:?}");
+        assert!(mgr.handle("/").unwrap().store.lock().unwrap().latest().is_some(), "old sample still stored");
+
+        // Reads work again: fresh samples, healthy again.
+        std::fs::remove_dir(&cpu_stat).unwrap();
+        std::fs::write(&cpu_stat, "usage_usec 2\nuser_usec 2\nsystem_usec 0\n").unwrap();
+        wait_for(&mgr, "ok").await;
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

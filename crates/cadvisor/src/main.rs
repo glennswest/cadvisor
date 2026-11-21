@@ -278,6 +278,7 @@ fn main() -> anyhow::Result<()> {
                 .route("/healthz", axum::routing::get(|| async { "ok" }))
                 .route("/-/healthy", axum::routing::get(|| async { "ok" }))
                 .route("/-/ready", axum::routing::get(|| async { "ok" }))
+                .route("/healthz/collecting", axum::routing::get(collecting).with_state(manager.clone()))
                 .merge(cadvisor_metrics::router(manager.clone(), metrics_opts))
                 .merge(cadvisor_api::router(manager.clone()));
             if let Some(auth) = auth {
@@ -306,6 +307,29 @@ fn main() -> anyhow::Result<()> {
             }
             Ok(())
         })
+}
+
+/// `/healthz/collecting` (#44 `a9c7ff6db1ab`): 200 while housekeeping keeps
+/// sampling the root container, 503 once its newest sample is older than
+/// `Manager::stale_after` (or there is none after that long). The API health
+/// probe reads this, because `/api/v2.0/stats` and `/metrics` keep serving
+/// the last stored sample however old it is.
+#[cfg(target_os = "linux")]
+async fn collecting(
+    axum::extract::State(manager): axum::extract::State<std::sync::Arc<cadvisor_manager::Manager>>,
+) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
+    let h = manager.collection_health();
+    let code = if h.healthy() {
+        axum::http::StatusCode::OK
+    } else {
+        axum::http::StatusCode::SERVICE_UNAVAILABLE
+    };
+    let body = serde_json::json!({
+        "status": h.status,
+        "root_sample_age_ms": h.root_sample_age.map(|a| a.as_millis() as u64),
+        "stale_after_ms": h.stale_after.as_millis() as u64,
+    });
+    (code, axum::Json(body))
 }
 
 #[cfg(not(target_os = "linux"))]

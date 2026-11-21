@@ -158,6 +158,7 @@ stays anonymous. Not yet on in the golden: stormcos#143.
 | Path | |
 |---|---|
 | `/healthz`, `/-/healthy`, `/-/ready` | `200 ok` once listening; do not check collectors |
+| `/healthz/collecting` | `503` when the root's newest sample is stale (#44) |
 | `/metrics` | Prometheus |
 | `/api/…` | REST v1.0–v1.3, v2.0–v2.1; `/api` lists versions (`400`, as upstream) |
 
