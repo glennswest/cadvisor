@@ -37,6 +37,14 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-11-21 — #44 review finding `a9c7ff6db1ab`: `/healthz/collecting`
+  (503 when the root sample is stale/absent past 3 × the longest root
+  interval); `stats` probe moved to it. Also #46/#48: e776e56 (#42) did not
+  compile (`Path::new(&diff_dir)`, 5b5aaee). Verified: sc-build-9f01e7647a on
+  5b5aaee (check-stubs, build, tests incl. `collection_health_tests` and
+  `api_probes.rs`, clippy -D warnings). Golden b55bb594dfdf is from 5b5aaee.
+  The registry `apis` edit + `component build cadvisor --force` went to the
+  master by note; live only after they run.
 - 2026-11-20 — #40 optional groups `tcp`, `udp`, `sched`, `hugetlb`, `percpu`
   (owner: "We need the metrics") + delimited protobuf on /metrics by `Accept`;
   `-disable_metrics` default = upstream's list; cfs/quota HELP lines. cgroup v2
@@ -292,12 +300,6 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
-- 2026-11-20 — #44 review finding `a9c7ff6db1ab`: API probes healthy while
-  housekeeping stops. `/healthz/collecting` (503 when the root sample is
-  stale/absent past 3 × the longest root interval), `stats` probe moved to it
-  (README table + `component edit` command; edit goes to the master by note,
-  then `component build cadvisor --force`). Tests:
-  `manager::collection_health_tests`, `tests/api_probes.rs`.
 - 2026-11-20 — #42 review findings in manager.rs: `0cfda650cfd7` mount table
   re-read with machine info (shared `Arc<FsService>` snapshot);
   `de041f31067b` containerd reconnect (success cached only), NotFound
