@@ -337,7 +337,11 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #15 P2 per-VM stats: cadvisor side done; needs-owner (close, or keep for a
   guest-matched proof). Network: rustkube-node#88 / stormvm#16.
 - #19 P2 test suites need https + token (proposed after stormcos#143).
-- #40 P2 built (sc-build-faadcbebed); waiting on the golden argv edit + forced
-  build (wait-owner --action), then shipped with a /metrics proof.
+- #40 P2 built (sc-build-faadcbebed); code in golden 4c3b0f84b2c5 (9976026).
+  2026-11-23: registry argv (now TLS + review auth, stormcos#143) still has no
+  `--enable_metrics`, so nodes expose none of the groups. A session can't
+  make the edit (refused here; `wait-owner --action` → 409 "session work"
+  from #1680). Note to the master with the exact `component edit` + `build
+  --force`; owner told. Then `shipped` with a /metrics proof (needs a token).
 - #22 P3 v0.49.2 conformance diff not re-run since 2026-07-16 (nothing runs it).
 
