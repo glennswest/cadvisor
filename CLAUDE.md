@@ -347,5 +347,9 @@ enrichment. Seven crates under `crates/` — see README.md.
   session's `component edit` was refused again (Claude Code permission).
   Nothing left in the code; waiting on the owner's registry edit + `build
   --force`. No new commit, so no `component build` request.
+  2026-11-24 later: the master applied the argv edit (export shows
+  `--enable_metrics cpu,…,hugetlb`); its build follows the release wave and
+  the node check (/metrics ~ container_network_tcp_usage_total) is the
+  master's. Off this session's hands.
 - #22 P3 v0.49.2 conformance diff not re-run since 2026-07-16 (nothing runs it).
 
