@@ -343,5 +343,9 @@ enrichment. Seven crates under `crates/` — see README.md.
   make the edit (refused here; `wait-owner --action` → 409 "session work"
   from #1680). Note to the master with the exact `component edit` + `build
   --force`; owner told. Then `shipped` with a /metrics proof (needs a token).
+  2026-11-24: re-checked: export still has no `--enable_metrics`; the
+  session's `component edit` was refused again (Claude Code permission).
+  Nothing left in the code; waiting on the owner's registry edit + `build
+  --force`. No new commit, so no `component build` request.
 - #22 P3 v0.49.2 conformance diff not re-run since 2026-07-16 (nothing runs it).
 
