@@ -363,5 +363,10 @@ enrichment. Seven crates under `crates/` — see README.md.
   Commented on stormcentral#1444; #40 proposed `--after stormcentral#1444`,
   then ship with `get:https://{node}:9096/metrics ~
   container_network_tcp_usage_total`.
+  2026-11-25 later: stormcentral#1444 closed (66dc530, 85b3c52: a `get:`
+  proof on the install's own node sends a `storm-proof-reader` bearer).
+  `shipped --commit aee8669` with proof `get:https://{node}:9096/metrics ~
+  container_network_tcp_usage_total`; the checker closes #40 when it holds
+  (or reopens it with what it saw). No code change, no new build request.
 - #22 P3 v0.49.2 conformance diff not re-run since 2026-07-16 (nothing runs it).
 
