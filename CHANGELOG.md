@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### 2026-11-24
+- **fix:** #43: the root container `/` reports `has_filesystem: true` again on `/api/v1.x` and `/api/v2.0/spec`, as upstream's raw handler for the root cgroup. `add_container` overwrote `build_spec`'s `true` with "has a writable layer". With it, `/api/v2.0/stats` for `/` carries the root sample's partitions in `filesystem`, and v2.0 `filesystem` is now the sample's v1 list for every container with a filesystem (upstream's `DeprecatedStatsFromV1`; it was always empty). v2.1 `filesystem` follows upstream's `ContainerStatsFromV1`: present only for a container with exactly one filesystem (it was `{}` otherwise), with the root's inode usage from the sample. `/metrics` and v1 stats are unchanged. Tests: `filesystem_tests::one_filesystem_gets_the_section_and_more_leave_it_out`, `tests/root_filesystem.rs` (real binary).
+
 ### 2026-11-21
 - **fix:** #45 `f2f527c85baf`: each `/api/v2.1/machinestats` entry's `filesystem` now comes from that root sample's own filesystem snapshot (durations ms → ns), as upstream's `MachineStatsFromV1`. Before, all ten entries carried the same values read at request time, so rates over the history were 0 then jumped. Tests: `machinestats_tests::each_entry_has_its_own_samples_filesystem`, `machine_fs_stats_from_v1_converts_ms_to_ns` (the first cut of the former failed on the build VM, #49).
 - **fix:** build: `Path::new(&diff_dir)` in housekeeping's writable-layer refresh; e776e56 (#42) passed a `String` and did not compile (#46, #48).

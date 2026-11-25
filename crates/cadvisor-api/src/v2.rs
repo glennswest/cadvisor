@@ -123,15 +123,11 @@ fn v2_stats_of(
             processes: spec.has_processes.then(|| {
                 s.processes.clone()
             }),
-            filesystem: spec.has_filesystem.then(|| {
-                let mut fs = v2::FilesystemStats::default();
-                if s.filesystem.len() == 1 {
-                    fs.total_usage_bytes = Some(s.filesystem[0].usage);
-                    fs.base_usage_bytes = Some(s.filesystem[0].base_usage);
-                    fs.inode_usage = Some(handle.fs_usage.read().unwrap().1);
-                }
-                fs
-            }),
+            filesystem: if spec.has_filesystem {
+                v2_filesystem(handle.name(), &s.filesystem, handle.fs_usage.read().unwrap().1)
+            } else {
+                None
+            },
             load: None,
             accelerators: s.accelerators.clone(),
             custom_metrics: s.custom_metrics.clone(),
@@ -144,10 +140,31 @@ fn v2_stats_of(
     out
 }
 
+/// v2 `filesystem` of one sample, as upstream's `ContainerStatsFromV1`:
+/// only a container with exactly one filesystem gets the section; more than
+/// one (the root container on most machines) or none leaves it out. The
+/// inode usage is the sample's `inodes` for `/` (upstream's raw handler
+/// fills it with the partition's inodes) and the writable layer's walked
+/// inode count otherwise (upstream's CRI-O handler) (#43).
+fn v2_filesystem(name: &str, fs: &[v1::FsStats], walked_inodes: u64) -> Option<v2::FilesystemStats> {
+    match fs {
+        [f] => Some(v2::FilesystemStats {
+            total_usage_bytes: Some(f.usage),
+            base_usage_bytes: Some(f.base_usage),
+            inode_usage: Some(if name == "/" { f.inodes } else { walked_inodes }),
+        }),
+        _ => None,
+    }
+}
+
+/// v2.0 `stats` (upstream's `DeprecatedStatsFromV1`): `filesystem` is the
+/// sample's whole v1 list when the spec has a filesystem (#43).
 fn deprecated_stats(handle: &ContainerHandle, spec: &v1::ContainerSpec, count: i64) -> Vec<v2::DeprecatedContainerStats> {
-    v2_stats(handle, spec, count)
+    let samples = handle.store.lock().unwrap().in_range(GoTime::zero(), GoTime::zero(), count);
+    v2_stats_of(handle, spec, &samples)
         .into_iter()
-        .map(|s| v2::DeprecatedContainerStats {
+        .zip(samples.iter())
+        .map(|(s, sample)| v2::DeprecatedContainerStats {
             timestamp: s.timestamp,
             has_cpu: spec.has_cpu,
             cpu: s.cpu.unwrap_or_default(),
@@ -163,7 +180,7 @@ fn deprecated_stats(handle: &ContainerHandle, spec: &v1::ContainerSpec, count: i
             has_processes: spec.has_processes,
             processes: s.processes.unwrap_or_default(),
             has_filesystem: spec.has_filesystem,
-            filesystem: Vec::new(),
+            filesystem: if spec.has_filesystem { sample.filesystem.clone() } else { Vec::new() },
             has_load: false,
             load: Default::default(),
             has_custom_metrics: spec.has_custom_metrics,
@@ -482,5 +499,29 @@ mod machinestats_tests {
         );
         assert_eq!(out[0].timestamp, samples[0].timestamp);
         assert_eq!(out[1].timestamp, samples[1].timestamp);
+    }
+}
+
+#[cfg(test)]
+mod filesystem_tests {
+    use super::*;
+
+    fn fs(dev: &str, usage: u64, inodes: u64) -> v1::FsStats {
+        v1::FsStats { device: dev.into(), usage, base_usage: usage, inodes, ..Default::default() }
+    }
+
+    #[test]
+    fn one_filesystem_gets_the_section_and_more_leave_it_out() {
+        assert_eq!(v2_filesystem("/", &[], 0), None);
+        assert_eq!(v2_filesystem("/", &[fs("/dev/sda1", 10, 7), fs("/dev/sda2", 20, 8)], 0), None);
+        assert_eq!(
+            v2_filesystem("/", &[fs("/dev/sda1", 10, 7)], 99),
+            Some(v2::FilesystemStats {
+                total_usage_bytes: Some(10),
+                base_usage_bytes: Some(10),
+                inode_usage: Some(7),
+            })
+        );
+        assert_eq!(v2_filesystem("/kubepods/abc", &[fs("/dev/sda1", 10, 7)], 99).unwrap().inode_usage, Some(99));
     }
 }

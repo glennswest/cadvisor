@@ -727,9 +727,10 @@ impl Manager {
             Some(meta) => Some(meta),
             None => self.runtime_meta(basename, 3).await,
         };
-        // Unchanged from before #42: has_filesystem only with a writable
-        // layer (apply_meta sets it), even for `/` (#43).
-        spec.has_filesystem = false;
+        // A container has a filesystem only with a writable layer
+        // (apply_meta sets it); `/` keeps build_spec's true, as upstream's
+        // raw handler for the root cgroup (#43).
+        spec.has_filesystem = name == "/";
         let handle = Arc::new(ContainerHandle::new(name, spec, self.cfg.storage_duration));
         match meta {
             Some(meta) => self.apply_meta(&handle, meta),

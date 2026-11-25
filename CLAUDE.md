@@ -315,6 +315,11 @@ enrichment. Seven crates under `crates/` — see README.md.
   retried, raw runtime handles re-enriched by housekeeping. Tests in
   `manager::refresh_tests` (fake CRI-O socket). Root `has_filesystem` is
   forced false by add_container (pre-existing; filed as #43).
+- 2026-11-24 — #43 root `has_filesystem` true (as upstream); v2.0 stats
+  `filesystem` = the sample's v1 list, v2.1 only with exactly one
+  filesystem (upstream's conversions). Tests:
+  `v2::filesystem_tests`, `tests/root_filesystem.rs`. Pushed; sc-build
+  submitted.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
