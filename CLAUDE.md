@@ -37,6 +37,12 @@ enrichment. Seven crates under `crates/` — see README.md.
 ## Work plan
 
 ### Done
+- 2026-11-25 — #43 root `has_filesystem` true (as upstream's raw handler);
+  v2.0 stats `filesystem` = the sample's v1 list, v2.1 only with exactly one
+  filesystem (upstream's conversions). Verified: sc-build-6474a66617 on
+  039510f (check-stubs, 127 tests incl. `v2::filesystem_tests` and
+  `tests/root_filesystem.rs` on the real binary, clippy -D warnings). Golden
+  requested.
 - 2026-11-21 — #45 review finding `f2f527c85baf`: `/api/v2.1/machinestats`
   takes each entry's filesystem from its own root sample
   (`MachineFsStats::from_v1`, ms → ns), not from a read at request time.
@@ -315,11 +321,6 @@ enrichment. Seven crates under `crates/` — see README.md.
   retried, raw runtime handles re-enriched by housekeeping. Tests in
   `manager::refresh_tests` (fake CRI-O socket). Root `has_filesystem` is
   forced false by add_container (pre-existing; filed as #43).
-- 2026-11-24 — #43 root `has_filesystem` true (as upstream); v2.0 stats
-  `filesystem` = the sample's v1 list, v2.1 only with exactly one
-  filesystem (upstream's conversions). Tests:
-  `v2::filesystem_tests`, `tests/root_filesystem.rs`. Pushed; sc-build
-  submitted.
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
 - TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
