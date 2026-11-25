@@ -357,5 +357,11 @@ enrichment. Seven crates under `crates/` — see README.md.
   `--enable_metrics cpu,…,hugetlb`); its build follows the release wave and
   the node check (/metrics ~ container_network_tcp_usage_total) is the
   master's. Off this session's hands.
+  2026-11-25: images at aee8669 (4ea19e9402d6, 041c7fa8242a) were built
+  after the edit. A `shipped` proof cannot show it: `get:` sends no bearer
+  (401 under review auth) and `api:`'s node proxy reaches only the kubelet.
+  Commented on stormcentral#1444; #40 proposed `--after stormcentral#1444`,
+  then ship with `get:https://{node}:9096/metrics ~
+  container_network_tcp_usage_total`.
 - #22 P3 v0.49.2 conformance diff not re-run since 2026-07-16 (nothing runs it).
 
