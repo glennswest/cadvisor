@@ -333,9 +333,9 @@ enrichment. Seven crates under `crates/` — see README.md.
   forced false by add_container (pre-existing; filed as #43).
 
 ### Known gaps (code does not do what upstream/docs imply) — tracked as issues
-- TLS / bearer auth (#4) and TokenReview auth (#27) are in the code but off
-  unless flags are set; the stormcos golden does not set them yet (stormcos#143: cert, token, https
-  liveness; the anonymous route is already dropped).
+- TLS / bearer auth (#4) and TokenReview auth (#27) are off unless flags are
+  set; the stormcos golden sets TLS + `--auth-mode review` since stormcos#143
+  (registry argv, golden-cadvisor-eeeac97e921e).
 - Mirror pods of stormd node services stay `id`-only until rustkube-node#407
   (the kubelet writes no workload record for them).
 - #19 the test Job's SA has no `get nodes/metrics`, so node runs get 403
