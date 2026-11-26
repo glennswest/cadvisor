@@ -9,25 +9,35 @@
 #                            a machine with one core — min-cores: 2 — and its
 #                            `oom` reports skip if the runtime applies no pod
 #                            memory limit.)
-#   hostNetwork: false      (cadvisor is reached at STORM_NODE:9096 from the
-#                            pod network; stormd at STORM_NODE:9196)
+#   hostNetwork: false      (cadvisor is reached at https://STORM_NODE:9096
+#                            from the pod network; stormd at STORM_NODE:9196)
 #   privileged: false
 #   api:      namespaced only: pods (create, get, list, delete) in the run's
 #             namespace; get on this Job's own pod (its image and node).
-#             Nothing cluster-scoped. Waves are sized from cadvisor's
+#             And `get` on `nodes/metrics` (ClusterRole
+#             stormcos:node-metrics): cadvisor's review (stormcos#143) allows
+#             a bearer only with it. test/requires.toml cannot grant a
+#             subresource yet (stormcentral#1786); by hand, bind it as below.
+#             Nothing else cluster-scoped: waves are sized from cadvisor's
 #             /api/v2.0/machine, not from nodes.
 #   creates:  workload pods `w-<run>-<n>` in the run's namespace, labelled
 #             storm.io/test-run=<run id> and cadvisor-test/workload=true,
 #             running this image as `/test workload <marker> …`, pinned to
 #             the Job's node. Deleted by every suite; the namespace's deletion
 #             is the backstop.
-#   targets:  cadvisor at STORM_NODE:9096, stormd at STORM_NODE:9196
+#   targets:  cadvisor at https://STORM_NODE:9096 with the Job's ServiceAccount
+#             token, its certificate verified against the ServiceAccount's
+#             ca.crt (the node CA); stormd at http://STORM_NODE:9196.
+#             Overrides: CADVISOR_TEST_SCHEME (https | http),
+#             CADVISOR_TEST_CA (PEM file), CADVISOR_TEST_TOKEN_FILE (file |
+#             none), CADVISOR_TEST_ADDR, CADVISOR_TEST_STORMD.
 #   external: none
 #   results:  JSON lines on stdout and /results/results.jsonl; the long
 #             suite's wave-N lines carry wave, pods, discover_ms, scrape_ms,
 #             drain_ms, residue, cadvisor_rss, cadvisor_fds.
 #
-# By hand: create the namespace, the ServiceAccount and Role below, fill in
+# By hand: create the namespace, the ServiceAccount, Role and the
+# ClusterRoleBinding below (delete the binding after: it is cluster-scoped), fill in
 # NAMESPACE / RUN_ID / NODE / API / SUITE / TIMEOUT / TIMEOUT_PLUS_MARGIN /
 # COMMIT / IMAGE, apply, read the Job's log, delete the namespace.
 ---
@@ -56,6 +66,16 @@ metadata:
   namespace: ${NAMESPACE}
   labels: { storm.io/test-run: "${RUN_ID}" }
 roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: storm-test }
+subjects:
+  - { kind: ServiceAccount, name: storm-test, namespace: "${NAMESPACE}" }
+---
+# cadvisor answers this ServiceAccount's token only with `get nodes/metrics`.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: storm-test-${RUN_ID}-node-metrics
+  labels: { storm.io/test-run: "${RUN_ID}" }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: "stormcos:node-metrics" }
 subjects:
   - { kind: ServiceAccount, name: storm-test, namespace: "${NAMESPACE}" }
 ---

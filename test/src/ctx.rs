@@ -56,7 +56,8 @@ impl Work {
 
 impl Ctx {
     pub async fn setup(env: &Env) -> Ctx {
-        let cad = Cad::new(&env.cadvisor);
+        // `run` has already built one from the same Env and stopped if it could not.
+        let cad = Cad::new(env).expect("cadvisor's client was built once already from this Env");
         if env.no_pods {
             return Ctx { cad, pods: Err(Why::Skip("CADVISOR_TEST_NO_PODS=1: no apiserver to start workloads through".into())) };
         }

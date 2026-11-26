@@ -1,11 +1,13 @@
-//! cadvisor, as the suites see it: its REST API and `/metrics` over plain
-//! HTTP at `STORM_NODE:9096`, and stormd's view of the process.
+//! cadvisor, as the suites see it: its REST API and `/metrics` at
+//! `STORM_NODE:9096` (https with a bearer on a stormcos node, see
+//! [`crate::env::CadAuth`]), and stormd's view of the process.
 
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
 
+use crate::env::Env;
 use crate::gotime;
 
 pub struct Resp {
@@ -17,23 +19,61 @@ pub struct Resp {
 #[derive(Clone)]
 pub struct Cad {
     pub addr: String,
+    /// `scheme://addr`.
+    base: String,
+    token: Option<String>,
     http: reqwest::Client,
+    /// The same, with no overall timeout: the event stream stays open.
+    streaming: reqwest::Client,
 }
 
 impl Cad {
-    pub fn new(addr: &str) -> Cad {
-        let http = reqwest::Client::builder()
-            .timeout(Duration::from_secs(30))
-            .connect_timeout(Duration::from_secs(5))
-            .build()
-            .expect("an HTTP client with no TLS settings builds");
-        Cad { addr: addr.to_string(), http }
+    /// A client for the cadvisor `env` names. An error is the configuration's
+    /// (a bad scheme, an unreadable token or CA, a CA that is not PEM).
+    pub fn new(env: &Env) -> Result<Cad, String> {
+        let a = &env.cad_auth;
+        if let Some(e) = &a.error {
+            return Err(e.clone());
+        }
+        let builder = || -> Result<reqwest::ClientBuilder, String> {
+            let mut b = reqwest::Client::builder().connect_timeout(Duration::from_secs(5));
+            if let Some(pem) = &a.ca {
+                let c = reqwest::Certificate::from_pem(pem).map_err(|e| format!("cadvisor's CA: {e}"))?;
+                b = b.add_root_certificate(c);
+            }
+            Ok(b)
+        };
+        let http = builder()?.timeout(Duration::from_secs(30)).build().map_err(|e| format!("http client: {e}"))?;
+        let streaming = builder()?.build().map_err(|e| format!("http client: {e}"))?;
+        Ok(Cad { addr: env.cadvisor.clone(), base: env.cadvisor_url(), token: a.token.clone(), http, streaming })
     }
 
-    /// Any path; the status is returned, not judged.
+    /// `https` or `http`.
+    pub fn scheme(&self) -> &str {
+        self.base.split(':').next().unwrap_or("")
+    }
+
+    pub fn has_token(&self) -> bool {
+        self.token.is_some()
+    }
+
+    /// Any path, with the bearer; the status is returned, not judged.
     pub async fn get(&self, path: &str) -> Result<Resp, String> {
-        let url = format!("http://{}{path}", self.addr);
-        let r = self.http.get(&url).send().await.map_err(|e| format!("GET {url}: {e}"))?;
+        self.get_as(path, true).await
+    }
+
+    /// Any path, with no bearer: what an anonymous caller is told.
+    pub async fn get_anonymous(&self, path: &str) -> Result<Resp, String> {
+        self.get_as(path, false).await
+    }
+
+    async fn get_as(&self, path: &str, bearer: bool) -> Result<Resp, String> {
+        let url = format!("{}{path}", self.base);
+        let mut rq = self.http.get(&url);
+        if let (true, Some(t)) = (bearer, &self.token) {
+            rq = rq.bearer_auth(t);
+        }
+        let r = rq.send().await.map_err(|e| format!("GET {url}: {}", chain(&e)))?;
         let status = r.status().as_u16();
         let content_type = r
             .headers()
@@ -45,11 +85,21 @@ impl Cad {
         Ok(Resp { status, content_type, body })
     }
 
+    /// What a refused request means here, for the error it ends in.
+    fn refused(&self, status: u16) -> &'static str {
+        match (status, self.token.is_some()) {
+            (401, false) => " (cadvisor wants a bearer and this run has none: CADVISOR_TEST_TOKEN_FILE, or the Job's ServiceAccount token)",
+            (401, true) => " (cadvisor does not accept this run's bearer)",
+            (403, _) => " (this run's ServiceAccount may not `get nodes/metrics`: the runner grants it through test/requires.toml, stormcentral#1786)",
+            _ => "",
+        }
+    }
+
     /// A JSON `200`, parsed; anything else is an error naming what came back.
     pub async fn json(&self, path: &str) -> Result<Value, String> {
         let r = self.get(path).await?;
         if r.status != 200 {
-            return Err(format!("GET {path}: {} {}", r.status, clip(&r.body)));
+            return Err(format!("GET {path}: {} {}{}", r.status, clip(&r.body), self.refused(r.status)));
         }
         if !r.content_type.starts_with("application/json") {
             return Err(format!("GET {path}: content-type {:?}", r.content_type));
@@ -61,7 +111,7 @@ impl Cad {
         let t = Instant::now();
         let r = self.get("/metrics").await?;
         if r.status != 200 {
-            return Err(format!("GET /metrics: {} {}", r.status, clip(&r.body)));
+            return Err(format!("GET /metrics: {} {}{}", r.status, clip(&r.body), self.refused(r.status)));
         }
         Ok((r.body, t.elapsed()))
     }
@@ -155,11 +205,15 @@ impl Cad {
 
     /// Open the event stream; `next_event` reads from it.
     pub async fn stream(&self, kinds: &str) -> Result<reqwest::Response, String> {
-        let url = format!("http://{}/api/v1.3/events/?{kinds}&subcontainers=true&stream=true", self.addr);
-        let c = reqwest::Client::builder().connect_timeout(Duration::from_secs(5)).build().map_err(|e| e.to_string())?;
-        let r = c.get(&url).send().await.map_err(|e| format!("GET {url}: {e}"))?;
-        if r.status().as_u16() != 200 {
-            return Err(format!("GET {url}: {}", r.status()));
+        let url = format!("{}/api/v1.3/events/?{kinds}&subcontainers=true&stream=true", self.base);
+        let mut rq = self.streaming.get(&url);
+        if let Some(t) = &self.token {
+            rq = rq.bearer_auth(t);
+        }
+        let r = rq.send().await.map_err(|e| format!("GET {url}: {}", chain(&e)))?;
+        let st = r.status().as_u16();
+        if st != 200 {
+            return Err(format!("GET {url}: {}{}", r.status(), self.refused(st)));
         }
         Ok(r)
     }
@@ -187,6 +241,18 @@ pub async fn next_event(r: &mut reqwest::Response, buf: &mut Vec<u8>, wait: Dura
             Ok(Ok(Some(b))) => buf.extend_from_slice(&b),
         }
     }
+}
+
+/// An error with its causes: reqwest's own text hides a TLS failure's reason.
+fn chain(e: &dyn std::error::Error) -> String {
+    let mut s = e.to_string();
+    let mut cur = e.source();
+    while let Some(c) = cur {
+        s.push_str(": ");
+        s.push_str(&c.to_string());
+        cur = c.source();
+    }
+    s
 }
 
 /// Whether a command line carries `marker` as a whole argument.

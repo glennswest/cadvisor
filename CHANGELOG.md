@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### 2026-11-25
+- **fix:** #19: the test suites reach cadvisor as the golden serves it since stormcos#143: https, the certificate verified against the Job's ServiceAccount `ca.crt` (the node CA), and the ServiceAccount token as the bearer. `CADVISOR_TEST_SCHEME`, `CADVISOR_TEST_CA` and `CADVISOR_TEST_TOKEN_FILE` (`none` for no bearer) override them, and a bad value is a could-not-run that names it. A `401` or `403` fails with the reason: no bearer, a bearer cadvisor refuses, or a ServiceAccount without `get nodes/metrics`. The event stream sends the bearer too. A TLS failure prints its cause. New medium test `auth`: with a bearer, an anonymous `/metrics` and REST call answer `401` and the health paths `200`. The harness runs the real binary with TLS and `--bearer-token-file`: short and medium over https, short over plain http, short with no bearer, and a certificate from another CA. A node run also needs the run's ServiceAccount bound to `stormcos:node-metrics`, which `test/requires.toml` cannot grant yet (stormcentral#1786). `test/cadvisor-test.yaml` shows the binding for a run by hand.
+
 ### 2026-11-24
 - **fix:** #43: the root container `/` reports `has_filesystem: true` again on `/api/v1.x` and `/api/v2.0/spec`, as upstream's raw handler for the root cgroup. `add_container` overwrote `build_spec`'s `true` with "has a writable layer". With it, `/api/v2.0/stats` for `/` carries the root sample's partitions in `filesystem`, and v2.0 `filesystem` is now the sample's v1 list for every container with a filesystem (upstream's `DeprecatedStatsFromV1`; it was always empty). v2.1 `filesystem` follows upstream's `ContainerStatsFromV1`: present only for a container with exactly one filesystem (it was `{}` otherwise), with the root's inode usage from the sample. `/metrics` and v1 stats are unchanged. Tests: `filesystem_tests::one_filesystem_gets_the_section_and_more_leave_it_out`, `tests/root_filesystem.rs` (real binary).
 

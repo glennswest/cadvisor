@@ -26,6 +26,8 @@ pub struct Report {
     file: Option<File>,
     /// Every test's name and status, in order (the harness asserts on it).
     pub outcomes: Vec<(String, &'static str)>,
+    /// Every test's name and detail, in the same order.
+    pub details: Vec<(String, String)>,
 }
 
 impl Default for Report {
@@ -39,7 +41,7 @@ impl Report {
         // `/results` is the runner's volume; without it (a hand run, the
         // harness) the lines still go to stdout.
         let file = OpenOptions::new().create(true).append(true).open("/results/results.jsonl").ok();
-        Report { pass: 0, fail: 0, skip: 0, infra: 0, file, outcomes: Vec::new() }
+        Report { pass: 0, fail: 0, skip: 0, infra: 0, file, outcomes: Vec::new(), details: Vec::new() }
     }
 
     /// Run one test, timed, and record it. Returns whether it passed.
@@ -77,6 +79,7 @@ impl Report {
             json(&detail)
         ));
         self.outcomes.push((name.to_string(), status));
+        self.details.push((name.to_string(), detail));
         status == "pass"
     }
 
@@ -135,7 +138,7 @@ mod tests {
 
     #[test]
     fn exit_codes_follow_the_standard() {
-        let mut r = Report { pass: 0, fail: 0, skip: 0, infra: 0, file: None, outcomes: vec![] };
+        let mut r = Report { pass: 0, fail: 0, skip: 0, infra: 0, file: None, outcomes: vec![], details: vec![] };
         r.record("a", Outcome::Pass(String::new()), 0, None);
         r.record("b", Outcome::Skip(String::new()), 0, None);
         assert_eq!(r.finish(), 0);

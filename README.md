@@ -438,7 +438,7 @@ program is `/test <suite>`. It writes one JSON line per test and exits 0
 | Suite | Budget | What it checks |
 |---|---|---|
 | `short` | < 2 min | `/healthz` and the other health paths; stormd reports cadvisor running (`:9196`); version; machine (API and `/metrics` agree); `/metrics` parses strictly (no duplicate series, a TYPE for every family, timestamps on stats); housekeeping keeps producing samples. Then one workload pod is found, its CPU and memory are reported, and it is gone after the delete. |
-| `medium` | < 30 min | The short checks again. Every v1/v2 endpoint's shape, the `400` listings and the upstream-worded `500` errors. 16 concurrent scrapes. Creation and deletion events, streamed and in the history. OOM kills, as `oom` + `oomKill` events and `container_oom_events_total`. Accuracy against half a core and 128 MiB, with `/metrics` agreeing with the API. One container per core (4–16), all found and all let go. stormd counts no restart. |
+| `medium` | < 30 min | The short checks again. Every v1/v2 endpoint's shape, the `400` listings and the upstream-worded `500` errors. 16 concurrent scrapes. Anonymous `/metrics` and REST calls get `401` when a bearer is in use (`auth`). Creation and deletion events, streamed and in the history. OOM kills, as `oom` + `oomKill` events and `container_oom_events_total`. Accuracy against half a core and 128 MiB, with `/metrics` agreeing with the API. One container per core (4–16), all found and all let go. stormd counts no restart. |
 | `long` | the night | Waves of workload containers sized from the machine: two per core, at most a quarter of memory, 4–128. Per wave it records discovery latency, scrape time (six scrapes per wave, 10 s apart, since a cgroup with no CPU use yet has no `container_cpu_usage_seconds_total`), drain time, containers left over (new since the wave began, minus ancestors of the wave's own containers), and cadvisor's own RSS and fds. The `trend` test fails on a slowdown or on residue that grows. |
 
 How it works on a node:
@@ -449,16 +449,33 @@ How it works on a node:
 - **A workload is found through cadvisor.** stormpump names pod cgroups
   opaquely (`/stormpump/w<tag>-<n>`, nested under `/stormpump/pods/<qos>/` on nodes), so the suite looks for the new container
   whose `/api/v2.0/ps` shows the marker.
-- **Nothing cluster-scoped.** The runner's Role covers only the run's
-  namespace, so waves are sized from cadvisor's `/api/v2.0/machine`, not from
-  `nodes`.
+- **cadvisor over https, with a bearer (#19).** Since stormcos#143 the golden
+  serves https with a node-CA pair and `--auth-mode review`. The suites send
+  the Job's ServiceAccount token and verify cadvisor's certificate against the
+  ServiceAccount's `ca.crt`, the node CA. `CADVISOR_TEST_SCHEME` (`https`, or
+  `http`), `CADVISOR_TEST_CA` (a PEM file) and `CADVISOR_TEST_TOKEN_FILE` (a
+  file, or `none`) override them. A refused request's failure says why: a
+  `401` (no bearer, or one cadvisor does not accept) or a `403` (the run's
+  ServiceAccount may not `get nodes/metrics`). medium's `auth` test checks
+  that an anonymous `/metrics` and REST call get `401` and the health paths
+  `200`.
+- **The run's ServiceAccount needs `get nodes/metrics`.** cadvisor's review
+  allows only that. The runner's Role covers only the run's namespace, and
+  `test/requires.toml` cannot grant a subresource yet (stormcentral#1786). Until it
+  can, a node run fails at `version` with that `403`. Otherwise nothing is
+  cluster-scoped: waves are sized from cadvisor's `/api/v2.0/machine`, not
+  from `nodes`.
 - **Skips.** `accuracy` needs at least two cores. `oom` is skipped when the
   runtime applies no pod memory limit. VM waves belong to stormvm's suite.
   `test/cadvisor-test.yaml` has the full metadata.
 
 On the build box, `cd test && CADVISOR_BIN=<path to cadvisor> cargo test`
 runs the unit tests. It also runs `tests/harness.rs`, which starts the real
-binary and runs `short` and `medium` against it, with the pod tests skipped.
+binary and runs the suites against it, with the pod tests skipped: `short`
+and `medium` over https with a bearer (a CA and certificate made with
+`openssl`, the token from `--bearer-token-file`), `short` over plain http,
+`short` with no bearer (health passes, the rest fails naming the `401`), and
+a certificate from another CA (could not run).
 
 **Status (2026-11-13):** `short` and `medium` pass on nodes, pod tests
 included. `short` passed 10/10 at 1f5c50a on pvetest1 (stormcentral run

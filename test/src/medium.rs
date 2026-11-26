@@ -28,6 +28,7 @@ pub async fn run(env: &Env, r: &mut Report) {
     check(r, "v1-endpoints", v1(&ctx.cad)).await;
     check(r, "v2-endpoints", v2(&ctx.cad)).await;
     check(r, "error-contract", errors(env, &ctx.cad)).await;
+    check(r, "auth", auth(&ctx.cad)).await;
     check(r, "metrics-concurrent", concurrent(&ctx.cad)).await;
     with_pods(r, &ctx, "events", events(env, &ctx)).await;
     with_pods(r, &ctx, "oom", oom(env, &ctx)).await;
@@ -161,6 +162,34 @@ async fn errors(env: &Env, cad: &Cad) -> Outcome {
         Outcome::Pass(_) => Outcome::Pass(format!("{} error cases worded as upstream; still healthy", cases.len())),
         other => other,
     }
+}
+
+/// With a bearer to send, cadvisor is expected to check it (the golden runs
+/// `--auth-mode review`, stormcos#143): an anonymous `/metrics` and REST call
+/// get `401`, while the health paths stay anonymous. With none, cadvisor runs
+/// without auth here and there is nothing to check.
+async fn auth(cad: &Cad) -> Outcome {
+    if !cad.has_token() {
+        return Outcome::Skip("no bearer for cadvisor here (CADVISOR_TEST_TOKEN_FILE=none): cadvisor runs without auth".into());
+    }
+    if let Err(e) = cad.metrics().await {
+        return Outcome::Fail(format!("with the run's bearer: {e}"));
+    }
+    for p in ["/metrics", "/api/v2.0/version", "/api/v1.3/containers/"] {
+        match cad.get_anonymous(p).await {
+            Ok(r) if r.status == 401 => {}
+            Ok(r) => return Outcome::Fail(format!("anonymous {p}: {} {:?}, want 401", r.status, cad::clip(&r.body))),
+            Err(e) => return Outcome::Fail(e),
+        }
+    }
+    for p in ["/healthz", "/-/healthy", "/-/ready"] {
+        match cad.get_anonymous(p).await {
+            Ok(r) if r.status == 200 => {}
+            Ok(r) => return Outcome::Fail(format!("anonymous {p}: {} {:?}, want 200", r.status, cad::clip(&r.body))),
+            Err(e) => return Outcome::Fail(e),
+        }
+    }
+    Outcome::Pass(format!("over {}: anonymous /metrics and REST answer 401, health paths 200, the run's bearer is accepted", cad.scheme()))
 }
 
 /// Sixteen scrapes at once all succeed and all parse.

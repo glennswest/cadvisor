@@ -3,7 +3,9 @@
 //! What cadvisor does on a node is watch every cgroup and report what each
 //! one uses, over `/metrics` and its REST API at `STORM_NODE:9096`. The
 //! suites test exactly that, from a pod, through its HTTP interfaces and the
-//! apiserver:
+//! apiserver. On a stormcos node cadvisor serves https and reviews each
+//! bearer (stormcos#143); the suites send the Job's ServiceAccount token and
+//! verify cadvisor's certificate against its `ca.crt` ([`env::CadAuth`]):
 //!
 //! - `short` (< 2 min): health, stormd's view, version, machine, `/metrics`,
 //!   housekeeping, and one workload pod seen, measured and let go.
@@ -56,7 +58,10 @@ pub async fn run(env: &Env, r: &mut Report) {
 /// (the node, or the path to it, is down). stormcos starts cadvisor on every
 /// node, so neither is a configuration to skip.
 async fn unreachable(env: &Env) -> Option<Outcome> {
-    let cad = cad::Cad::new(&env.cadvisor);
+    let cad = match cad::Cad::new(env) {
+        Ok(c) => c,
+        Err(e) => return Some(Outcome::Infra(format!("cannot reach cadvisor as configured: {e}"))),
+    };
     let mut last = String::new();
     for _ in 0..5 {
         match cad.get("/healthz").await {
