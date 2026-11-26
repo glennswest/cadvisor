@@ -315,6 +315,16 @@ enrichment. Seven crates under `crates/` — see README.md.
   the README table. Gaps filed as #9, #10, #11 (and #4 already open).
 
 ### In progress
+- 2026-11-25 — #19 suites over https + bearer (the golden runs TLS +
+  review auth since stormcos#143): `CadAuth` in `test/src/env.rs` (SA token
+  and `ca.crt` by default; `CADVISOR_TEST_SCHEME`/`_CA`/`_TOKEN_FILE`),
+  `Cad::new(&Env)`, 401/403 explained, medium `auth` test; harness runs the
+  real binary with an openssl CA + `--bearer-token-file` (https short+medium,
+  http short, no bearer, wrong CA). Code 939adc0, sc-build
+  20261126-012124-939adc0e submitted. A node run also needs the run's SA
+  bound to `stormcos:node-metrics`; requires.toml refuses subresources, so
+  filed stormcentral#1786. Next: once it ships, declare its key in
+  `test/requires.toml`, run short + medium on a node, close #19.
 - 2026-11-20 — #42 review findings in manager.rs: `0cfda650cfd7` mount table
   re-read with machine info (shared `Arc<FsService>` snapshot);
   `de041f31067b` containerd reconnect (success cached only), NotFound
@@ -328,8 +338,9 @@ enrichment. Seven crates under `crates/` — see README.md.
   liveness; the anonymous route is already dropped).
 - Mirror pods of stormd node services stay `id`-only until rustkube-node#407
   (the kubelet writes no workload record for them).
-- #19 the test crate talks plain HTTP without a token (`test/src/cad.rs`);
-  it needs https + a token once stormcos#143 turns TLS/auth on in the golden.
+- #19 the test Job's SA has no `get nodes/metrics`, so node runs get 403
+  past the health paths until stormcentral#1786 (the https + token side is
+  done, 939adc0).
 - The version is still 0.1.0: the #14 fix is in golden cc73674e1ff2 without a
   release tag.
 
@@ -342,7 +353,8 @@ enrichment. Seven crates under `crates/` — see README.md.
 - #16 P3 Decide: bare `pod`/`namespace` labels (beyond upstream) — owner's call.
 - #15 P2 per-VM stats: cadvisor side done; needs-owner (close, or keep for a
   guest-matched proof). Network: rustkube-node#88 / stormvm#16.
-- #19 P2 test suites need https + token (proposed after stormcos#143).
+- #19 P2 test suites over https + token: code done (939adc0); node runs wait
+  on stormcentral#1786 (a requires.toml grant of `nodes/metrics`).
 - #40 P2 built (sc-build-faadcbebed); code in golden 4c3b0f84b2c5 (9976026).
   2026-11-23: registry argv (now TLS + review auth, stormcos#143) still has no
   `--enable_metrics`, so nodes expose none of the groups. A session can't
